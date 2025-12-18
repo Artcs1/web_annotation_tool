@@ -9,6 +9,8 @@ conda activate webapp
 ```
 ### 2. Install Requirements
 ```bash
-conda create --name webapp python=3.10
-conda activate webapp
+pip install pymongo
+pip install flask
+pip install numpy
+pip install python-dotenv
 ```
