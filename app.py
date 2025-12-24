@@ -202,7 +202,10 @@ class VideoAnnotationApp:
                 import traceback
                 traceback.print_exc()
                 return jsonify({'success': False, 'error': str(e)}), 500
-        
+
+video_app = VideoAnnotationApp()
+app = video_app.app
+
 if __name__ == '__main__':
-    app_instance = VideoAnnotationApp()
-    app_instance.app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+        

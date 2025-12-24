@@ -24,7 +24,6 @@ class VideoAnnotationTool {
         this.isResizing = false;
         this.currentBox = null;
         this.resizeHandle = null;
-        this.drawingEnabled = false;
         
         this.annotatorId = null;
         this.loadAnnotatorId();
@@ -85,7 +84,6 @@ class VideoAnnotationTool {
         this.watchedStatus = document.getElementById('watchedStatus');
         this.currentVideoNum = document.getElementById('currentVideoNum');
         this.totalVideoNum = document.getElementById('totalVideoNum');
-        this.addBoxBtn = document.getElementById('addBoxBtn');
         this.boxCount = document.getElementById('boxCount');
         this.videoScrubber = document.getElementById('videoScrubber');
         this.speedButtons = document.querySelectorAll('.speed-btn');
@@ -113,7 +111,6 @@ class VideoAnnotationTool {
             }
         });
         
-        this.addBoxBtn.addEventListener('click', () => this.enableDrawing());
         this.submitBtn.addEventListener('click', () => this.submitAnnotation());
         
         // Scrubber controls
@@ -198,20 +195,6 @@ class VideoAnnotationTool {
         return this.videos[this.currentVideoIndex];
     }
     
-    enableDrawing() {
-        this.drawingEnabled = true;
-        this.annotationCanvas.style.cursor = 'crosshair';
-        this.addBoxBtn.textContent = '✏️ Drawing Mode Active';
-        this.addBoxBtn.style.background = 'linear-gradient(45deg, #ff9800, #f57c00)';
-    }
-    
-    disableDrawing() {
-        this.drawingEnabled = false;
-        this.annotationCanvas.style.cursor = 'default';
-        this.addBoxBtn.textContent = '➕ Add New Box';
-        this.addBoxBtn.style.background = 'linear-gradient(45deg, #4CAF50, #45a049)';
-    }
-    
     handleMouseDown(e) {
         if (e.target.classList.contains('box-handle')) {
             this.startResize(e);
@@ -224,9 +207,8 @@ class VideoAnnotationTool {
             return;
         }
         
-        if (this.drawingEnabled) {
-            this.startDrawing(e);
-        }
+        // Always start drawing when clicking on the canvas
+        this.startDrawing(e);
     }
     
     handleMouseMove(e) {
@@ -259,6 +241,8 @@ class VideoAnnotationTool {
         const normalizedY = (pixelY / imgRect.height) * this.NORMALIZED_HEIGHT;
         
         this.isDrawing = true;
+        this.annotationCanvas.style.cursor = 'crosshair';
+        
         this.currentBox = {
             id: Date.now(),
             startX: normalizedX,
@@ -278,10 +262,14 @@ class VideoAnnotationTool {
         const imgRect = this.annotationImage.getBoundingClientRect();
         const pixelX = e.clientX - imgRect.left;
         const pixelY = e.clientY - imgRect.top;
+
+        console.log(pixelX)
+        console.log(pixelY)
         
         this.currentBox.endX = (pixelX / imgRect.width) * this.NORMALIZED_WIDTH;
         this.currentBox.endY = (pixelY / imgRect.height) * this.NORMALIZED_HEIGHT;
-        
+
+            
         this.updateBoxPosition(this.currentBox);
     }
     
@@ -289,6 +277,7 @@ class VideoAnnotationTool {
         if (!this.isDrawing || !this.currentBox) return;
         
         this.isDrawing = false;
+        this.annotationCanvas.style.cursor = 'default';
         
         const width = Math.abs(this.currentBox.endX - this.currentBox.startX);
         const height = Math.abs(this.currentBox.endY - this.currentBox.startY);
@@ -310,8 +299,9 @@ class VideoAnnotationTool {
             this.updateSelectionInfo();
         }
         
+        this.updateBoxPosition(this.currentBox);
+
         this.currentBox = null;
-        this.disableDrawing();
         this.checkSubmitReady();
     }
     
@@ -399,6 +389,29 @@ class VideoAnnotationTool {
         box.element.style.top = `${canvasY}px`;
         box.element.style.width = `${width}px`;
         box.element.style.height = `${height}px`;
+        
+        // Smart label positioning - flip to left if it would overflow right edge
+        if (box.labelElement) {
+            const labelWidth = box.labelElement.offsetWidth || 200; // Approximate width
+            const boxLeft = canvasX;
+            const canvasWidth = rect.width;
+
+            const deleteBtn = box.element.querySelector('.box-delete');
+            const boxRight = canvasX + width;
+
+            // Check if label would overflow the right edge
+            if (boxLeft + labelWidth > canvasWidth) {
+                box.labelElement.style.left = 'auto';
+                box.labelElement.style.right = '0px';
+                deleteBtn.style.left = 'auto';
+                deleteBtn.style.right = '-15px';
+            } else {
+                box.labelElement.style.left = '0px';
+                box.labelElement.style.right = 'auto';
+                deleteBtn.style.left = '-15px';
+                deleteBtn.style.right = 'auto';
+            }
+        }
     }
     
     repositionAllBoxes() {
@@ -436,7 +449,7 @@ class VideoAnnotationTool {
             this.currentBox.endX = normalizedX;
             this.currentBox.endY = normalizedY;
         }
-        
+
         this.updateBoxPosition(this.currentBox);
     }
     
@@ -483,7 +496,7 @@ class VideoAnnotationTool {
         this.boxCount.textContent = this.selectionBoxes.length;
         
         if (this.selectionBoxes.length === 0) {
-            this.selectionCoords.innerHTML = 'Click "Add New Box" to start drawing';
+            this.selectionCoords.innerHTML = 'Click and drag on the image to draw boxes';
             return;
         }
         
@@ -505,12 +518,12 @@ class VideoAnnotationTool {
         
         this.selectionCoords.innerHTML = html;
     }
-    
+
     setBoxRating(boxId, rating) {
         const box = this.selectionBoxes.find(b => b.id === boxId);
         if (box) {
             box.confidence = rating;
-            
+
             // Update button styles
             if (box.confidenceContainer) {
                 const buttons = box.confidenceContainer.querySelectorAll('.box-confidence-btn');
@@ -522,13 +535,32 @@ class VideoAnnotationTool {
                     }
                 });
             }
-            
+
+            // Make the box body not block clicks, but keep handles and buttons interactive
+            box.element.style.pointerEvents = 'none';
+
+            // Re-enable pointer events for interactive elements
+            if (box.labelElement) box.labelElement.style.pointerEvents = 'auto';
+            if (box.confidenceContainer) box.confidenceContainer.style.pointerEvents = 'auto';
+            const deleteBtn = box.element.querySelector('.box-delete');
+            if (deleteBtn) deleteBtn.style.pointerEvents = 'auto';
+            Object.values(box.handles).forEach(handle => {
+                handle.style.pointerEvents = 'auto';
+            });
+
+            // Ensure unrated boxes remain fully interactive
+            this.selectionBoxes.forEach(b => {
+                if (b.id !== boxId && (b.confidence === null || b.confidence === undefined)) {
+                    b.element.style.pointerEvents = 'auto';
+                }
+            });
+
             this.updateSelectionInfo();
         }
-        
+
         this.checkSubmitReady();
     }
-    
+
     setPlaybackSpeed(speed) {
         this.playbackSpeed = speed;
         
@@ -696,7 +728,6 @@ class VideoAnnotationTool {
             if (this.currentVideoIndex < this.totalVideos - 1) {
                 this.loadVideo(this.currentVideoIndex + 1);
             } else {
-                //await this.saveAllAnnotations();
                 window.location.href = "/thank_you";
             }
         } catch (error) {
