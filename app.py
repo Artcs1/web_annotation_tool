@@ -79,11 +79,12 @@ class VideoAnnotationApp:
             # Get video files
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
             files.sort()
+            print(files)
             videos = []
             
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file[7:]
+                folder_name = file.split('/',1)[1]#file[7:]
                 
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"
@@ -98,6 +99,9 @@ class VideoAnnotationApp:
             
             num_videos   = len(videos)
             num_blocks   = num_videos//self.number_of_clips
+
+            print(num_videos)
+            print(ann_incompleted)
             
             if len(ann_incompleted) == 0:
                 possible_choices = np.arange(num_blocks)
@@ -134,7 +138,8 @@ class VideoAnnotationApp:
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
             files.sort()
             
-            folder_name = files[video_index][7:]
+            folder_name = files[video_index].split('/',1)[1]#[7:]
+            print(folder_name)
             
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
             folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
