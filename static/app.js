@@ -747,7 +747,7 @@ class VideoAnnotationTool {
             console.error('Error saving annotation:', error);
         }
     }
-    
+
     async saveAllAnnotations() {
         const finalData = {
             completedAt: new Date().toISOString(),
@@ -765,7 +765,7 @@ class VideoAnnotationTool {
             console.error('Error saving all annotations:', error);
         }
     }
-    
+
     resetVideoState() {
         this.hasWatchedVideo = false;
         this.totalWatchTime = 0;

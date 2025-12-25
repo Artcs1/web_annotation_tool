@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Group Annotation Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .left-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .right-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+        
+        .video-progress {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .annotation-frame-section {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section-label {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .frame-canvas {
+            background: #1a1a1a;
+            cursor: crosshair;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            min-height: 400px;
+        }
+        
+        .frame-image {
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            object-fit: contain;
+            background: #000;
+            pointer-events: none;
+            user-drag: none;
+            -webkit-user-drag: none;
+            user-select: none;
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 3px solid #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+            border-radius: 5px;
+            z-index: 10;
+        }
+        
+        .box-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #ff6b6b;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 11;
+        }
+        
+        .handle-tl { top: -6px; left: -6px; cursor: nw-resize; }
+        .handle-tr { top: -6px; right: -6px; cursor: ne-resize; }
+        .handle-bl { bottom: -6px; left: -6px; cursor: sw-resize; }
+        .handle-br { bottom: -6px; right: -6px; cursor: se-resize; }
+        
+        .box-delete {
+            position: absolute;
+            top: -30px;
+            left: -15px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 12;
+        }
+        
+        .box-delete:hover {
+            background: #cc0000;
+            transform: scale(1.1);
+        }
+        
+        .box-label {
+            position: absolute;
+            top: -30px;
+            left: 0;
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 11;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .box-confidence-container {
+            display: flex;
+            gap: 0.5px;
+        }
+        
+        .box-confidence-btn {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #667eea;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .box-confidence-btn:hover {
+            background: #e8ecff;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+        }
+        
+        .box-confidence-btn:active {
+            transform: translateY(0);
+        }
+        
+        .box-confidence-btn.selected {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-color: #764ba2;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.6);
+            transform: translateY(-1px);
+        }
+        
+        .video-preview-section {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .video-canvas {
+            background: #1a1a1a;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .play-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .pause-btn {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+            color: white;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .frame-info {
+            color: #666;
+            font-size: 14px;
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+        
+        .playback-status {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .status-watched {
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+        }
+        
+        .status-not-watched {
+            color: #ff9800;
+            border: 2px solid #ff9800;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .selection-info {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .selection-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .selection-coords {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .box-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .add-box-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .add-box-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        .submit-section {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-playing {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-paused {
+            background: #ff9800;
+        }
+        
+        .tip-text {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .error-message {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .video-scrubber {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .scrubber-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .scrubber-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .scrubber-slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .keyboard-shortcuts {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .keyboard-shortcuts h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .shortcut-key {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .confidence-guidelines {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+
+        .confidence-guidelines h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .confidence-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .confidence-key {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+
+
+        .instructions-section {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .instructions-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .instructions-section ol {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .instructions-section li {
+            margin-bottom: 8px;
+        }
+
+        .instructions-section strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <div class="video-progress" id="videoProgress">
+                🎥 Video <span id="currentVideoNum">1</span> of <span id="totalVideoNum">?</span>
+            </div>
+            
+            <div class="annotation-frame-section">
+                <div class="section-label">🎯 Annotation Frame - Draw Selection Here</div>
+                <div class="frame-canvas" id="annotationCanvas">
+                    <img class="frame-image" id="annotationImage" src="" alt="Annotation Frame">
+                </div>
+            </div>
+            
+            <div class="video-preview-section">
+                <div class="section-label">🎬 Video Preview - Watch to Help Your Decision</div>
+                <div class="video-canvas" id="videoCanvas">
+                    <img class="frame-image" id="videoImage" src="" alt="Video Frame">
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn play-btn" id="playBtn">▶️ Play</button>
+                <button class="control-btn pause-btn" id="pauseBtn" style="display: none;">⏸️ Pause</button>
+                <div class="frame-info">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    Frame: <span id="frameCounter">1</span> / <span id="totalFrames">50</span>
+                </div>
+            </div>
+            
+            <div class="video-scrubber">
+                <input type="range" class="scrubber-slider" id="videoScrubber" min="0" max="49" value="0">
+            </div>
+            
+            <div class="playback-status" id="playbackStatus">
+                <span id="watchedStatus">⏸️ Video Not Watched</span>
+            </div>
+        </div>
+        
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <h2 class="section-title">📝 Annotation Tool</h2>
+            
+            <div class="instructions-section">
+                <h3>📋 How to Annotate</h3>
+                <ol>
+                    <li>Click and drag on the annotation image to draw a box around a group</li>
+                    <li>Draw a box around a group on the image</li>
+                    <li>Click a <strong>number button (1-5)</strong> above the box to rate confidence</li>
+                    <li>Drag corners to resize, click × to delete</li>
+                    <li>Repeat for all groups in the video</li>
+                    <li>Click <strong>"Submit Annotation"</strong> when done</li>
+                </ol>
+                <div class="tip-text" style="margin-top: 10px;">
+                    💡 <strong>Tip:</strong> You can submit without boxes to skip a video if no groups are present.
+                </div>
+            </div>
+            
+            <div class="selection-info">
+                <h3>🎯 Selection Areas (<span id="boxCount">0</span>)</h3>
+                <div class="selection-coords" id="selectionCoords">
+                    Click and drag on the annotation image to draw a box around a group
+                </div>
+            </div>
+            
+            <div class="submit-section">
+                <button class="submit-btn" id="submitBtn" disabled>Submit Annotation</button>
+            </div>
+
+            <div class="confidence-guidelines">
+                <h4>📈Confidence scores</h4>
+                <div class="confidence-item">
+                    <span>Very uncertain about group membership</span>
+                    <span class="confidence-key">1</span>
+                </div>
+                <div class="confidence-item">
+                    <span>Frequent doubts in labeling</span>
+                    <span class="confidence-key">2</span>
+                </div>
+                <div class="confidence-item">
+                    <span>Some uncertainty remains</span>
+                    <span class="confidence-key">3</span>
+                </div>
+                <div class="confidence-item">
+                    <span>Mostly sure about group membership</span>
+                    <span class="confidence-key">4</span>
+                </div>
+                <div class="confidence-item">
+                    <span>Certain about group detection correctness</span>
+                    <span class="confidence-key">5</span>
+                </div>
+            </div>
+ 
+
+            <div class="keyboard-shortcuts">
+                <h4>⌨️ Keyboard Shortcuts</h4>
+                <div class="shortcut-item">
+                    <span>Play/Pause</span>
+                    <span class="shortcut-key">Shift</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Next Frame</span>
+                    <span class="shortcut-key">→</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Previous Frame</span>
+                    <span class="shortcut-key">←</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Skip +5 Frames</span>
+                    <span class="shortcut-key">Shift + →</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Skip -5 Frames</span>
+                    <span class="shortcut-key">Shift + ←</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
