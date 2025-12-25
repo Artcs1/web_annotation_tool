@@ -536,6 +536,10 @@ class VideoAnnotationTool {
                 });
             }
 
+            if (box.labelElement) {
+                box.labelElement.classList.add('hidden');
+            }
+
             // Make the box body not block clicks, but keep handles and buttons interactive
             box.element.style.pointerEvents = 'none';
 
@@ -740,7 +744,10 @@ class VideoAnnotationTool {
                 }
             } else {
                 if (data.score >= 0.7)
+                {
+                    alert('Your AP score is ' + data.score.toFixed(2) + '. Great job! You have access to the annotation because your score is above 0.7.');
                     window.location.href = "/annotation";
+                }
                 else{
                     alert('Your AP score is '+data.score.toFixed(2)+'. Please note that a minimum score of 0.7 is required to proceed with annotation.')
                     this.loadVideo(this.currentVideoIndex);

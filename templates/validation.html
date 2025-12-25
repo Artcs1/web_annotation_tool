@@ -165,6 +165,12 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            transition: opacity 0.3s ease;
+        }
+
+        .box-label.hidden {  /* ← ADDED THIS ENTIRE CLASS */
+            opacity: 0;
+            pointer-events: none;
         }
         
         .box-confidence-container {
@@ -746,6 +752,34 @@
             justify-content: center;
             margin-bottom: 15px;
         }
+
+        .validation-phase-banner {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(245, 124, 0, 0.3);
+            border: 3px solid #ff6f00;
+        }
+
+        .validation-phase-banner h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .validation-phase-banner p {
+            font-size: 16px;
+            margin: 0;
+            font-weight: 500;
+            opacity: 0.95;
+        }
+
     </style>
 </head>
 <body>
@@ -817,6 +851,12 @@
         
         <!-- Right Panel -->
         <div class="right-panel">
+
+            <div class="validation-phase-banner">
+                <h1>⚠️ VALIDATION PHASE ⚠️</h1>
+                <p>This is a training session to ensure annotation quality. You must score ≥0.7 to proceed to the actual annotation phase.</p>
+            </div>
+
             <h2 class="section-title">📝 Validation for the Annotation Tool</h2>
             
             <div class="help-button-container">

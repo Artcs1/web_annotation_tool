@@ -165,6 +165,12 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            transition: opacity 0.3s ease;
+        }
+
+        .box-label.hidden {  /* ← ADDED THIS ENTIRE CLASS */
+            opacity: 0;
+            pointer-events: none;
         }
         
         .box-confidence-container {

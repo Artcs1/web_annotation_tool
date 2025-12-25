@@ -536,6 +536,10 @@ class VideoAnnotationTool {
                 });
             }
 
+            if (box.labelElement) {
+                box.labelElement.classList.add('hidden');
+            }
+
             // Make the box body not block clicks, but keep handles and buttons interactive
             box.element.style.pointerEvents = 'none';
 
