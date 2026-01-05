@@ -24,6 +24,7 @@ class VideoAnnotationTool {
         this.isResizing = false;
         this.currentBox = null;
         this.resizeHandle = null;
+        this.annotatedFrame = 1;
         
         this.annotatorId = null;
         this.loadAnnotatorId();
@@ -55,6 +56,7 @@ class VideoAnnotationTool {
                 this.videos = data.videos;
                 this.totalVideos = data.total_videos;
                 this.totalVideoNum.textContent = this.totalVideos;
+                this.annotatedFrame = data.annotatedFrame;
                 
                 if (this.totalVideos > 0) {
                     this.loadVideo(0);
@@ -178,8 +180,8 @@ class VideoAnnotationTool {
         this.currentVideoNum.textContent = index + 1;
         
         const video = this.videos[index];
-        
-        this.annotationImage.src = `/api/video/${video.index}/frame/0`;
+
+        this.annotationImage.src = `/api/video/${video.index}/frame/${this.annotatedFrame}`;
         this.loadVideoFrame(video.index, 0);
         
         this.clearAllBoxes();
@@ -720,7 +722,7 @@ class VideoAnnotationTool {
             groups: boxes,
             videoInfo: {
                 totalFrames: this.totalFrames,
-                annotationFrame: 1,
+                annotationFrame: this.annotatedFrame,
                 coordinateSystem: 'normalized',
                 normalizedWidth: this.NORMALIZED_WIDTH,
                 normalizedHeight: this.NORMALIZED_HEIGHT

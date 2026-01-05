@@ -10,6 +10,7 @@ import numpy as np
 from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from collections import Counter
 
 load_dotenv()
 
@@ -35,6 +36,7 @@ class VideoAnnotationApp:
         self.FRAME_EXTENSION = '.jpeg'
         self.FRAME_PADDING = 4
         self.FRAME_COUNT_PADDING = 5
+        self.choices_annotatedframe = [1,20,40]
 
         # MongoDB setup
         try:
@@ -150,12 +152,20 @@ class VideoAnnotationApp:
             except:
                 ann_results = []
 
-            annotated_clips = [result['globalIndex']-1 for result in ann_results]
-            
-            annotated_block = [ann//self.number_of_clips for ann in annotated_clips]
-            unique, counts = np.unique(annotated_block, return_counts=True)
-            ann_completed   = [int(u) for u, c in zip(unique, counts) if c == self.number_of_clips] 
-            ann_incompleted = [(int(u), int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
+            annotated_clips = [(result['globalIndex']-1, result['videoInfo']['annotationFrame']) for result in ann_results]
+            print(annotated_clips)
+            annotated_block = [(ann[0]//self.number_of_clips, ann[1]) for ann in annotated_clips]
+            print(annotated_block)
+
+            counter = Counter(annotated_block)
+            unique = list(counter.keys())
+            counts = list(counter.values())
+
+            print(unique)
+            print(counts)
+
+            ann_completed   = [u for u, c in zip(unique, counts) if c == self.number_of_clips] 
+            ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
             
             # Get video files
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
@@ -181,32 +191,46 @@ class VideoAnnotationApp:
             num_blocks   = num_videos//self.number_of_clips
 
             if len(ann_incompleted) == 0:
-                possible_choices = np.arange(num_blocks)
-                global_counts = [self.annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips)}) 
-                                for p in possible_choices]
-                possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]
-                possible_choices = np.setdiff1d(possible_choices, ann_completed)
+                possible_choices = [(block, f) for block in np.arange(num_blocks) for f in self.choices_annotatedframe]
+                global_counts = [self.annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips), "videoInfo.annotationFrame": f}) for p, f in possible_choices]
+                possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]  
+                possible_choices = list(set(possible_choices) - set(ann_completed))
                 
                 id_r = random.randint(0, len(possible_choices)-1)
-                rand_number = possible_choices[id_r] 
+                rand_number    = possible_choices[id_r][0]
                 videos      = videos[int(rand_number*self.number_of_clips):int((rand_number+1)*self.number_of_clips)]
                 start_index = int(rand_number*self.number_of_clips)
+
+
+                if (rand_number, 1) in set(possible_choices):
+                    annotatedFrame = 1
+                elif (rand_number, 20) in set(possible_choices):
+                    annotatedFrame = 20
+                elif (rand_number, 40) in set(possible_choices):
+                    annotatedFrame = 40
+
             else:
-                possible_choices = [p[0] for p in ann_incompleted]
+
+
+                possible_choices = [p[0][0] for p in ann_incompleted]
+                possible_frames =  [p[0][1] for p in ann_incompleted]
                 left_in = [p[1] for p in ann_incompleted]
                 
                 id_r = random.randint(0, len(possible_choices)-1)
-                rand_number = possible_choices[id_r] 
-                videos      = videos[int(rand_number*self.number_of_clips)+left_in[id_r]:int((rand_number+1)*self.number_of_clips)]
-                start_index = int(rand_number*self.number_of_clips)
-            
+
+                rand_number    = possible_choices[id_r] 
+                videos         = videos[int(rand_number*self.number_of_clips)+left_in[id_r]:int((rand_number+1)*self.number_of_clips)]
+                start_index    = int(rand_number*self.number_of_clips)+left_in[id_r]
+                annotatedFrame = possible_frames[id_r]
+
             return jsonify({
                 'success': True,
                 'start_index': start_index,
                 'total_videos': len(videos),
+                'annotatedFrame': annotatedFrame,
                 'videos': videos
             })
-        
+
         @self.app.route('/api/video/<int:video_index>/frame/<int:frame_index>')
         def get_frame(video_index, frame_index):
             """Serve a specific frame from a video"""
