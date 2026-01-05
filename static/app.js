@@ -86,6 +86,7 @@ class VideoAnnotationTool {
         this.watchedStatus = document.getElementById('watchedStatus');
         this.currentVideoNum = document.getElementById('currentVideoNum');
         this.totalVideoNum = document.getElementById('totalVideoNum');
+        this.currentFrameNum = document.getElementById('currentFrameNum');
         this.boxCount = document.getElementById('boxCount');
         this.videoScrubber = document.getElementById('videoScrubber');
         this.speedButtons = document.querySelectorAll('.speed-btn');
@@ -178,7 +179,8 @@ class VideoAnnotationTool {
         this.currentVideoIndex = index;
         this.globalVideoIndex +=1;
         this.currentVideoNum.textContent = index + 1;
-        
+        this.currentFrameNum.textContent = this.annotatedFrame;
+
         const video = this.videos[index];
 
         this.annotationImage.src = `/api/video/${video.index}/frame/${this.annotatedFrame}`;

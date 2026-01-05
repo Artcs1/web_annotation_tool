@@ -36,7 +36,7 @@ class VideoAnnotationApp:
         self.FRAME_EXTENSION = '.jpeg'
         self.FRAME_PADDING = 4
         self.FRAME_COUNT_PADDING = 5
-        self.choices_annotatedframe = [1,20,40]
+        self.choices_annotatedframe = [1,21,41]
 
         # MongoDB setup
         try:
@@ -202,12 +202,10 @@ class VideoAnnotationApp:
                 start_index = int(rand_number*self.number_of_clips)
 
 
-                if (rand_number, 1) in set(possible_choices):
-                    annotatedFrame = 1
-                elif (rand_number, 20) in set(possible_choices):
-                    annotatedFrame = 20
-                elif (rand_number, 40) in set(possible_choices):
-                    annotatedFrame = 40
+                for f in self.choices_annotatedframe:
+                    if (rand_number, f) in set(possible_choices):
+                        annotatedFrame = f
+                        break
 
             else:
 
