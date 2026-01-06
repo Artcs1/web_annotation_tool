@@ -413,6 +413,21 @@
             font-size: 13px;
             line-height: 1.4;
         }
+
+        .focus-text {
+            color: #222;
+            font-size: 16px;
+            line-height: 1.6;
+            font-weight: 500;
+            background: rgba(255, 235, 59, 0.25);
+            padding: 6px 10px;
+            border-left: 4px solid #fbc02d;
+            border-radius: 4px;
+            text-align: justify;
+        }
+
+        
+
         
         @keyframes pulse {
             0% { opacity: 1; }
@@ -646,6 +661,14 @@
             
             <div class="instructions-section">
                 <h3>📋 How to Annotate</h3>
+                <div class="focus-text" style="margin-top: 10px;">
+                    💡 <strong>Task:</strong> Label a group when two or more people clearly move together or interact over time. Do not label people as a group if they are only briefly close due to crowding and show no shared movement or interaction.<br><br>
+                    <strong> Group Example: </strong> A family walking down a sidewalk.<br>
+                    <strong> Group Example: </strong> Two friends chatting while moving through a market.<br>
+                    <strong> Group Example: </strong> A customer and a street vendor engaged in a short interaction.<br>
+                    <strong> Not Group Example: </strong> People who are briefly close only because of crowding and show no shared movement or interaction. <br><br>
+                </div>
+ 
                 <ol>
                     <li>Click and drag on the annotation image to draw a box around a group</li>
                     <li>Draw a box around a group on the image</li>
@@ -657,14 +680,7 @@
                 <div class="tip-text" style="margin-top: 10px;">
                     💡 <strong>Tip:</strong> You can submit without boxes to skip a video if no groups are present.
                 </div>
-                <div class="tip-text" style="margin-top: 10px;">
-                    💡 <strong>Tip:</strong> Label a group when two or more people clearly move together or interact over time. Do not label people as a group if they are only briefly close due to crowding and show no shared movement or interaction.<br><br>
-                    <strong> Group Example: </strong> A family walking down a sidewalk.<br>
-                    <strong> Group Example: </strong> Two friends chatting while moving through a market.<br>
-                    <strong> Group Example: </strong> A customer and a street vendor engaged in a short interaction.<br>
-                    <strong> Not Group Example: </strong> People who are briefly close only because of crowding and show no shared movement or interaction.
-                </div>
-            </div>
+           </div>
             
             <div class="selection-info">
                 <h3>🎯 Selection Areas (<span id="boxCount">0</span>)</h3>
