@@ -1,3 +1,4 @@
+// Enhanced VideoAnnotationTool with comprehensive timestamp tracking
 class VideoAnnotationTool {
     constructor() {
         this.currentVideoIndex = 0;
@@ -27,11 +28,37 @@ class VideoAnnotationTool {
         this.annotatedFrame = 1;
         
         this.annotatorId = null;
+        
+        // NEW: Video action tracking
+        this.videoActionHistory = [];
+        this.sessionStartTime = new Date().toISOString();
+        this.videoLoadTime = null;
+        
         this.loadAnnotatorId();
-
         this.initElements();
         this.bindEvents();
         this.loadVideos();
+    }
+    
+    // NEW: Track video actions with timestamps
+    logVideoAction(action, metadata = {}) {
+        const timestamp = new Date().toISOString();
+        const timeSinceVideoLoad = this.videoLoadTime 
+            ? Date.now() - new Date(this.videoLoadTime).getTime()
+            : 0;
+        
+        const actionLog = {
+            timestamp,
+            timeSinceVideoLoad,
+            action,
+            currentFrame: this.currentFrame,
+            isPlaying: this.isPlaying,
+            playbackSpeed: this.playbackSpeed,
+            ...metadata
+        };
+        
+        this.videoActionHistory.push(actionLog);
+        console.log('Video Action:', actionLog);
     }
     
     async loadAnnotatorId() {
@@ -51,7 +78,6 @@ class VideoAnnotationTool {
             const data = await response.json();
             
             if (data.success) {
-
                 this.globalVideoIndex = data.start_index;
                 this.videos = data.videos;
                 this.totalVideos = data.total_videos;
@@ -116,16 +142,25 @@ class VideoAnnotationTool {
         
         this.submitBtn.addEventListener('click', () => this.submitAnnotation());
         
-        // Scrubber controls
+        // Scrubber controls with timestamp tracking
         this.videoScrubber.addEventListener('input', (e) => {
+            const previousFrame = this.currentFrame;
+            const newFrame = parseInt(e.target.value);
+            
+            this.logVideoAction('scrubber_seek', {
+                fromFrame: previousFrame,
+                toFrame: newFrame,
+                frameDelta: newFrame - previousFrame
+            });
+            
             this.hasWatchedVideo = true;
             this.updateWatchedStatus();
-            this.currentFrame = parseInt(e.target.value);
+            this.currentFrame = newFrame;
             this.loadVideoFrame(this.getCurrentVideo().index, this.currentFrame);
             this.updateDisplay();
         });
         
-        // Speed controls
+        // Speed controls with timestamp tracking
         this.speedButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const speed = parseFloat(e.target.dataset.speed);
@@ -133,7 +168,7 @@ class VideoAnnotationTool {
             });
         });
         
-        // Keyboard shortcuts
+        // Keyboard shortcuts with timestamp tracking
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
                 return;
@@ -142,7 +177,11 @@ class VideoAnnotationTool {
             switch(e.key) {
                 case 'Shift':
                     e.preventDefault();
-                    this.isPlaying ? this.pause() : this.play();
+                    if (this.isPlaying) {
+                        this.pause();
+                    } else {
+                        this.play();
+                    }
                     break;
                 case 'ArrowRight':
                     this.hasWatchedVideo = true;
@@ -175,13 +214,24 @@ class VideoAnnotationTool {
         if (index >= this.totalVideos) {
             return;
         }
-        
+    
+        this.deletedBoxes = []
         this.currentVideoIndex = index;
-        this.globalVideoIndex +=1;
+        this.globalVideoIndex += 1;
         this.currentVideoNum.textContent = index + 1;
         this.currentFrameNum.textContent = this.annotatedFrame;
 
         const video = this.videos[index];
+
+        // NEW: Reset video action tracking for new video
+        this.videoActionHistory = [];
+        this.videoLoadTime = new Date().toISOString();
+        this.logVideoAction('video_loaded', {
+            videoIndex: this.currentVideoIndex,
+            globalVideoIndex: this.globalVideoIndex,
+            videoFolder: video.folder,
+            annotatedFrame: this.annotatedFrame
+        });
 
         this.annotationImage.src = `/api/video/${video.index}/frame/${this.annotatedFrame}`;
         this.loadVideoFrame(video.index, 0);
@@ -211,7 +261,6 @@ class VideoAnnotationTool {
             return;
         }
         
-        // Always start drawing when clicking on the canvas
         this.startDrawing(e);
     }
     
@@ -247,13 +296,21 @@ class VideoAnnotationTool {
         this.isDrawing = true;
         this.annotationCanvas.style.cursor = 'crosshair';
         
+        const timestamp = new Date().toISOString();
+        
         this.currentBox = {
             id: Date.now(),
             startX: normalizedX,
             startY: normalizedY,
             endX: normalizedX,
             endY: normalizedY,
-            element: this.createBoxElement()
+            element: this.createBoxElement(),
+            createdAt: timestamp,
+            lastModified: timestamp,
+            modificationHistory: [{
+                action: 'created',
+                timestamp: timestamp
+            }]
         };
         
         this.annotationCanvas.appendChild(this.currentBox.element);
@@ -266,13 +323,9 @@ class VideoAnnotationTool {
         const imgRect = this.annotationImage.getBoundingClientRect();
         const pixelX = e.clientX - imgRect.left;
         const pixelY = e.clientY - imgRect.top;
-
-        console.log(pixelX)
-        console.log(pixelY)
         
         this.currentBox.endX = (pixelX / imgRect.width) * this.NORMALIZED_WIDTH;
         this.currentBox.endY = (pixelY / imgRect.height) * this.NORMALIZED_HEIGHT;
-
             
         this.updateBoxPosition(this.currentBox);
     }
@@ -298,13 +351,19 @@ class VideoAnnotationTool {
         if (width < minSize || height < minSize) {
             this.annotationCanvas.removeChild(this.currentBox.element);
         } else {
+            const timestamp = new Date().toISOString();
+            this.currentBox.lastModified = timestamp;
+            this.currentBox.modificationHistory.push({
+                action: 'drawing_completed',
+                timestamp: timestamp
+            });
+            
             this.selectionBoxes.push(this.currentBox);
             this.addBoxHandles(this.currentBox);
             this.updateSelectionInfo();
         }
         
         this.updateBoxPosition(this.currentBox);
-
         this.currentBox = null;
         this.checkSubmitReady();
     }
@@ -319,7 +378,6 @@ class VideoAnnotationTool {
         const boxIndex = this.selectionBoxes.length;
         box.confidence = null;
         
-        // Create label container with group name and confidence buttons inline
         const label = document.createElement('div');
         label.className = 'box-label';
         
@@ -327,7 +385,6 @@ class VideoAnnotationTool {
         groupText.textContent = `Group ${boxIndex}`;
         label.appendChild(groupText);
         
-        // Add confidence buttons inline
         const confidenceContainer = document.createElement('div');
         confidenceContainer.className = 'box-confidence-container';
         
@@ -394,16 +451,13 @@ class VideoAnnotationTool {
         box.element.style.width = `${width}px`;
         box.element.style.height = `${height}px`;
         
-        // Smart label positioning - flip to left if it would overflow right edge
         if (box.labelElement) {
-            const labelWidth = box.labelElement.offsetWidth || 200; // Approximate width
+            const labelWidth = box.labelElement.offsetWidth || 200;
             const boxLeft = canvasX;
             const canvasWidth = rect.width;
 
             const deleteBtn = box.element.querySelector('.box-delete');
-            const boxRight = canvasX + width;
 
-            // Check if label would overflow the right edge
             if (boxLeft + labelWidth > canvasWidth) {
                 box.labelElement.style.left = 'auto';
                 box.labelElement.style.right = '0px';
@@ -428,6 +482,15 @@ class VideoAnnotationTool {
         const boxId = parseInt(e.target.dataset.boxId);
         
         this.currentBox = this.selectionBoxes.find(box => box.id === boxId);
+        
+        if (this.currentBox) {
+            const timestamp = new Date().toISOString();
+            this.currentBox.modificationHistory.push({
+                action: 'resize_started',
+                timestamp: timestamp,
+                handle: this.resizeHandle
+            });
+        }
     }
     
     updateResize(e) {
@@ -458,6 +521,22 @@ class VideoAnnotationTool {
     }
     
     endResize() {
+        if (!this.currentBox) return;
+        
+        const timestamp = new Date().toISOString();
+        this.currentBox.lastModified = timestamp;
+        this.currentBox.modificationHistory.push({
+            action: 'resize_completed',
+            timestamp: timestamp,
+            handle: this.resizeHandle,
+            finalCoordinates: {
+                startX: this.currentBox.startX,
+                startY: this.currentBox.startY,
+                endX: this.currentBox.endX,
+                endY: this.currentBox.endY
+            }
+        });
+        
         this.isResizing = false;
         this.resizeHandle = null;
         this.updateSelectionInfo();
@@ -465,17 +544,45 @@ class VideoAnnotationTool {
     }
     
     deleteBox(box) {
+        // Record deletion in modification history BEFORE removing from DOM
+        const timestamp = new Date().toISOString();
+        box.lastModified = timestamp;
+        box.modificationHistory.push({
+            action: 'deleted',
+            timestamp: timestamp,
+            deletedCoordinates: {
+                startX: box.startX,
+                startY: box.startY,
+                endX: box.endX,
+                endY: box.endY
+            },
+            confidence: box.confidence,
+            totalModificationsBeforeDeletion: box.modificationHistory.length
+        });
+        
+        // Mark as deleted (logical delete)
+        box.isDeleted = true;
+        
+        // Remove from DOM (visual delete)
         this.annotationCanvas.removeChild(box.element);
+        
+        // Remove from active selection boxes array
         const index = this.selectionBoxes.indexOf(box);
         if (index > -1) {
             this.selectionBoxes.splice(index, 1);
         }
         
+        // Optional: Keep deleted boxes in a separate array for analysis
+        if (!this.deletedBoxes) {
+            this.deletedBoxes = [];
+        }
+        this.deletedBoxes.push(box);
+        
         this.updateBoxLabels();
         this.updateSelectionInfo();
         this.checkSubmitReady();
     }
-    
+
     updateBoxLabels() {
         this.selectionBoxes.forEach((box, i) => {
             if (box.labelElement) {
@@ -513,10 +620,14 @@ class VideoAnnotationTool {
             
             const confidenceText = box.confidence ? `Confidence: ${box.confidence}` : 'No confidence set';
             
+            const createdTime = new Date(box.createdAt).toLocaleTimeString();
+            const modifiedTime = new Date(box.lastModified).toLocaleTimeString();
+            
             html += `<div class="box-item">
                 <strong>Group ${i + 1}</strong><br>
                 Coordinates: (${x1}, ${y1}, ${x2}, ${y2})<br>
-                <span style="color: ${box.confidence ? '#4CAF50' : '#ff9800'};">${confidenceText}</span>
+                <span style="color: ${box.confidence ? '#4CAF50' : '#ff9800'};">${confidenceText}</span><br>
+                <small style="color: #999;">Created: ${createdTime} | Modified: ${modifiedTime}</small>
             </div>`;
         });
         
@@ -526,9 +637,16 @@ class VideoAnnotationTool {
     setBoxRating(boxId, rating) {
         const box = this.selectionBoxes.find(b => b.id === boxId);
         if (box) {
+            const timestamp = new Date().toISOString();
+            
             box.confidence = rating;
+            box.lastModified = timestamp;
+            box.modificationHistory.push({
+                action: 'confidence_set',
+                timestamp: timestamp,
+                confidence: rating
+            });
 
-            // Update button styles
             if (box.confidenceContainer) {
                 const buttons = box.confidenceContainer.querySelectorAll('.box-confidence-btn');
                 buttons.forEach(btn => {
@@ -544,10 +662,8 @@ class VideoAnnotationTool {
                 box.labelElement.classList.add('hidden');
             }
 
-            // Make the box body not block clicks, but keep handles and buttons interactive
             box.element.style.pointerEvents = 'none';
 
-            // Re-enable pointer events for interactive elements
             if (box.labelElement) box.labelElement.style.pointerEvents = 'auto';
             if (box.confidenceContainer) box.confidenceContainer.style.pointerEvents = 'auto';
             const deleteBtn = box.element.querySelector('.box-delete');
@@ -556,7 +672,6 @@ class VideoAnnotationTool {
                 handle.style.pointerEvents = 'auto';
             });
 
-            // Ensure unrated boxes remain fully interactive
             this.selectionBoxes.forEach(b => {
                 if (b.id !== boxId && (b.confidence === null || b.confidence === undefined)) {
                     b.element.style.pointerEvents = 'auto';
@@ -570,7 +685,14 @@ class VideoAnnotationTool {
     }
 
     setPlaybackSpeed(speed) {
+        const previousSpeed = this.playbackSpeed;
         this.playbackSpeed = speed;
+        
+        // NEW: Log speed change
+        this.logVideoAction('playback_speed_changed', {
+            fromSpeed: previousSpeed,
+            toSpeed: speed
+        });
         
         this.speedButtons.forEach(btn => {
             if (parseFloat(btn.dataset.speed) === speed) {
@@ -590,7 +712,17 @@ class VideoAnnotationTool {
         if (this.isPlaying) {
             this.pause();
         }
+        
+        const previousFrame = this.currentFrame;
         this.currentFrame = Math.min(this.currentFrame + 1, this.totalFrames - 1);
+        
+        // NEW: Log frame navigation
+        this.logVideoAction('frame_next', {
+            fromFrame: previousFrame,
+            toFrame: this.currentFrame,
+            method: 'keyboard_or_button'
+        });
+        
         this.loadVideoFrame(this.getCurrentVideo().index, this.currentFrame);
         this.updateDisplay();
         this.videoScrubber.value = this.currentFrame;
@@ -600,7 +732,17 @@ class VideoAnnotationTool {
         if (this.isPlaying) {
             this.pause();
         }
+        
+        const previousFrame = this.currentFrame;
         this.currentFrame = Math.max(this.currentFrame - 1, 0);
+        
+        // NEW: Log frame navigation
+        this.logVideoAction('frame_previous', {
+            fromFrame: previousFrame,
+            toFrame: this.currentFrame,
+            method: 'keyboard_or_button'
+        });
+        
         this.loadVideoFrame(this.getCurrentVideo().index, this.currentFrame);
         this.updateDisplay();
         this.videoScrubber.value = this.currentFrame;
@@ -610,7 +752,18 @@ class VideoAnnotationTool {
         if (this.isPlaying) {
             this.pause();
         }
+        
+        const previousFrame = this.currentFrame;
         this.currentFrame = Math.max(0, Math.min(this.currentFrame + count, this.totalFrames - 1));
+        
+        // NEW: Log frame skip
+        this.logVideoAction('frame_skip', {
+            fromFrame: previousFrame,
+            toFrame: this.currentFrame,
+            skipCount: count,
+            method: 'keyboard'
+        });
+        
         this.loadVideoFrame(this.getCurrentVideo().index, this.currentFrame);
         this.updateDisplay();
         this.videoScrubber.value = this.currentFrame;
@@ -620,11 +773,17 @@ class VideoAnnotationTool {
         if (!this.hasWatchedVideo) {
             this.hasWatchedVideo = true;
             this.updateWatchedStatus();
-       }
+        }
         
         if (!this.videoPlayStartTime) {
             this.videoPlayStartTime = Date.now();
         }
+        
+        // NEW: Log play action
+        this.logVideoAction('play', {
+            startFrame: this.currentFrame,
+            playbackSpeed: this.playbackSpeed
+        });
         
         this.isPlaying = true;
         this.playBtn.style.display = 'none';
@@ -636,6 +795,11 @@ class VideoAnnotationTool {
             this.currentFrame++;
             if (this.currentFrame >= this.totalFrames) {
                 this.currentFrame = 0;
+                
+                // NEW: Log video loop
+                this.logVideoAction('video_looped', {
+                    playbackSpeed: this.playbackSpeed
+                });
             }
             this.loadVideoFrame(video.index, this.currentFrame);
             this.updateDisplay();
@@ -648,6 +812,12 @@ class VideoAnnotationTool {
             this.totalWatchTime += (Date.now() - this.videoPlayStartTime);
             this.videoPlayStartTime = null;
         }
+        
+        // NEW: Log pause action
+        this.logVideoAction('pause', {
+            pausedAtFrame: this.currentFrame,
+            totalWatchTimeMs: this.totalWatchTime
+        });
         
         this.isPlaying = false;
         this.playBtn.style.display = 'inline-flex';
@@ -685,7 +855,7 @@ class VideoAnnotationTool {
         const allRated = this.selectionBoxes.every(box => box.confidence !== null && box.confidence !== undefined);
         this.submitBtn.disabled = !allRated;
     }
-    
+
     async submitAnnotation() {
         if (this.selectionBoxes.length > 0) {
             const allRated = this.selectionBoxes.every(box => box.confidence !== null && box.confidence !== undefined);
@@ -694,24 +864,49 @@ class VideoAnnotationTool {
                 return;
             }
         }
-        
+
         if (this.isPlaying) {
             this.pause();
         }
-        
+
+        // Process active boxes
         const boxes = this.selectionBoxes.map((box, i) => {
             const x1 = Math.round(Math.min(box.startX, box.endX));
             const y1 = Math.round(Math.min(box.startY, box.endY));
             const x2 = Math.round(Math.max(box.startX, box.endX));
             const y2 = Math.round(Math.max(box.startY, box.endY));
-            
+
             return {
                 groupId: i + 1,
                 bbox: [x1, y1, x2, y2],
-                confidence: box.confidence
+                confidence: box.confidence,
+                createdAt: box.createdAt,
+                lastModified: box.lastModified,
+                modificationHistory: box.modificationHistory,
+                totalModifications: box.modificationHistory.length,
+                isDeleted: false
             };
         });
-        
+
+        // Process deleted boxes (if any)
+        const deletedBoxes = (this.deletedBoxes || []).map((box, i) => {
+            const x1 = Math.round(Math.min(box.startX, box.endX));
+            const y1 = Math.round(Math.min(box.startY, box.endY));
+            const x2 = Math.round(Math.max(box.startX, box.endX));
+            const y2 = Math.round(Math.max(box.startY, box.endY));
+
+            return {
+                groupId: `deleted_${i + 1}`,
+                bbox: [x1, y1, x2, y2],
+                confidence: box.confidence,
+                createdAt: box.createdAt,
+                lastModified: box.lastModified,
+                modificationHistory: box.modificationHistory,
+                totalModifications: box.modificationHistory.length,
+                isDeleted: true
+            };
+        });
+
         const video = this.getCurrentVideo();
         const annotation = {
             timestamp: new Date().toISOString(),
@@ -721,18 +916,24 @@ class VideoAnnotationTool {
             videoWatched: this.hasWatchedVideo,
             totalWatchTimeMs: this.totalWatchTime + (this.videoPlayStartTime ? (Date.now() - this.videoPlayStartTime) : 0),
             numberOfGroups: this.selectionBoxes.length,
+            numberOfDeletedGroups: deletedBoxes.length,
             groups: boxes,
+            deletedGroups: deletedBoxes, // Include deleted boxes
             videoInfo: {
                 totalFrames: this.totalFrames,
                 annotationFrame: this.annotatedFrame,
                 coordinateSystem: 'normalized',
                 normalizedWidth: this.NORMALIZED_WIDTH,
                 normalizedHeight: this.NORMALIZED_HEIGHT
-            }
+            },
+            videoActionHistory: this.videoActionHistory,
+            sessionStartTime: this.sessionStartTime,
+            videoLoadTime: this.videoLoadTime,
+            annotationDuration: Date.now() - new Date(this.videoLoadTime).getTime()
         };
-        
+
         try {
-            await this.saveAnnotation(annotation)
+            await this.saveAnnotation(annotation);
             if (this.currentVideoIndex < this.totalVideos - 1) {
                 this.loadVideo(this.currentVideoIndex + 1);
             } else {
@@ -744,36 +945,18 @@ class VideoAnnotationTool {
         }
     }
 
-    async saveAnnotation(annotation){
-        try{
+    async saveAnnotation(annotation) {
+        try {
             await fetch('/api/save-annotation', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(annotation)
             });
-        } catch (error){
+        } catch (error) {
             console.error('Error saving annotation:', error);
         }
     }
-
-    async saveAllAnnotations() {
-        const finalData = {
-            completedAt: new Date().toISOString(),
-            totalVideos: this.totalVideos,
-            annotations: this.allAnnotations
-        };
-        
-        try {
-            await fetch('/api/save-all-annotations', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(finalData)
-            });
-        } catch (error) {
-            console.error('Error saving all annotations:', error);
-        }
-    }
-
+    
     resetVideoState() {
         this.hasWatchedVideo = false;
         this.totalWatchTime = 0;
