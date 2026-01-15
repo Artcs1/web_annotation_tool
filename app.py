@@ -7,6 +7,7 @@ import json
 import glob
 import random
 import numpy as np
+import pickle
 from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -31,6 +32,7 @@ class VideoAnnotationApp:
         self.annotator_per_clip = 5
         self.number_of_clips = 15
         self.VIDEO_BASE_PATH = 'videos'
+        self.YES_NO_VIDEO_BASE_PATH = 'yes_no_videos'
         self.VIDEO_VALIDATION_BASE_PATH = 'validation_videos'
         self.GTS_VALIDATION_BASE_PATH = 'validation_gts'
         self.FRAME_EXTENSION = '.jpeg'
@@ -43,11 +45,57 @@ class VideoAnnotationApp:
             self.client = MongoClient(self.MONGO_URI)
             self.db = self.client[self.MONGO_DB]
             self.annotations_collection = self.db['annotations']
+            self.yes_no_annotations_collection = self.db['yes_no_annotations']
             print(f"✅ Connected to MongoDB: {self.MONGO_DB}")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
             self.client = None
             self.db = None
+
+        def generate_boxes(groups):
+
+            boxes = []
+            for i, group in enumerate(groups):
+                boxes.append({
+                    'id': f'box_{i}',
+                    'tl_x1': group[0],
+                    'tl_y1': group[1],
+                    'br_x1': group[2],
+                    'br_y1': group[3],
+                    'confidence': random.randint(1, 5)  # Random confidence 1-5
+                })
+
+            return boxes
+
+        def generate_random_boxes(num_boxes=None, img_width=1920, img_height=1080):
+            """Generate random bounding boxes for a frame"""
+            if num_boxes is None:
+                num_boxes = random.randint(1, 5)  # Random 1-5 boxes
+            
+            boxes = []
+            for i in range(num_boxes):
+                box_width = random.randint(50, int(img_width * 0.3))
+                box_height = random.randint(50, int(img_height * 0.3))
+                
+                x = random.randint(0, img_width - box_width)
+                y = random.randint(0, img_height - box_height)
+                
+                tl_x1 = int(x-(box_width//2))
+                tl_y1 = int(y-(box_width//2))
+                br_x1 = int(x+(box_width//2))
+                br_y1 = int(y+(box_width//2))
+                
+                boxes.append({
+                    'id': f'box_{i}',
+                    'tl_x1': tl_x1,
+                    'tl_y1': tl_y1,
+                    'br_x1': br_x1,
+                    'br_y1': br_y1,
+                    'confidence': random.randint(1, 5)  # Random confidence 1-5
+                })
+
+            return boxes
+
 
         def iou(boxA, boxB):
             xA = max(boxA[0], boxB[0])
@@ -101,6 +149,14 @@ class VideoAnnotationApp:
         @self.app.route("/thank_you")
         def thank_you():
             return render_template("thank_you.html")
+
+        @self.app.route('/yes_no_annotation')
+        def yes_no_index():
+            return render_template('yes_no_annotation.html')
+
+        @self.app.route("/yes_no_thank_you")
+        def yes_no_thank_you():
+            return render_template("yes_no_thank_you.html")
 
         @self.app.route('/api/validation/detect-videos')
         def validation_detect_videos():
@@ -323,6 +379,151 @@ class VideoAnnotationApp:
                 import traceback
                 traceback.print_exc()
                 return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/api_yes_no/detect-videos')
+        def yes_no_detect_videos():
+            """Detect available video folders"""
+
+            # Get completed annotations
+            try:
+                ann_results = self.yes_no_annotations_collection.find({"annotator_id": session['annotator_id']})
+            except:
+                ann_results = []
+
+            annotated_clips = [(result['globalIndex']-1, result['videoInfo']['annotationFrame']) for result in ann_results]
+            annotated_block = [(ann[0]//self.number_of_clips, ann[1]) for ann in annotated_clips]
+
+            counter = Counter(annotated_block)
+            unique = list(counter.keys())
+            counts = list(counter.values())
+
+            ann_completed   = [u for u, c in zip(unique, counts) if c == self.number_of_clips]
+            ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
+
+            files = glob.glob(self.YES_NO_VIDEO_BASE_PATH+'/*')
+            files.sort()
+            videos = []
+
+            for i, file in enumerate(files):
+                folder_path = file
+                folder_name = file.split('/',1)[1]#file[7:]
+
+                if os.path.isdir(folder_path):
+                    first_frame = f"00001{self.FRAME_EXTENSION}"
+                    first_frame_path = os.path.join(folder_path, first_frame)
+
+                    if os.path.exists(first_frame_path):
+
+                        videos.append({
+                            'index': i,
+                            'folder': folder_name,
+                            'path': folder_path,
+                        })
+
+            num_videos   = len(videos)
+            num_blocks   = num_videos//self.number_of_clips
+
+            if len(ann_incompleted) == 0:
+                possible_choices = [(block, f) for block in np.arange(num_blocks) for f in self.choices_annotatedframe]
+                global_counts = [self.yes_no_annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips), "videoInfo.annotationFrame": f}) for p, f in possible_choices]
+                possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]
+                possible_choices = list(set(possible_choices) - set(ann_completed))
+
+                id_r = random.randint(0, len(possible_choices)-1)
+                rand_number    = possible_choices[id_r][0]
+                videos      = videos[int(rand_number*self.number_of_clips):int((rand_number+1)*self.number_of_clips)]
+                start_index = int(rand_number*self.number_of_clips)
+
+
+                for f in self.choices_annotatedframe:
+                    if (rand_number, f) in set(possible_choices):
+                        annotatedFrame = f
+                        break
+
+            else:
+
+
+                possible_choices = [p[0][0] for p in ann_incompleted]
+                possible_frames =  [p[0][1] for p in ann_incompleted]
+                left_in = [p[1] for p in ann_incompleted]
+
+                id_r = random.randint(0, len(possible_choices)-1)
+
+                rand_number    = possible_choices[id_r]
+                videos         = videos[int(rand_number*self.number_of_clips)+left_in[id_r]:int((rand_number+1)*self.number_of_clips)]
+                start_index    = int(rand_number*self.number_of_clips)+left_in[id_r]
+                annotatedFrame = possible_frames[id_r]
+
+
+            for ind, video in enumerate(videos):
+
+                group_file = f"groups/{annotatedFrame}_{video['folder']}.pkl"
+                with open(group_file, 'rb') as f:
+                    groups = pickle.load(f)
+
+                all_boxes = []
+                splits = []
+
+                for group in groups:
+                    boxes = generate_boxes(group)
+                    all_boxes.extend(boxes)
+                    splits.append(boxes)
+
+                videos[ind]['splits'] = splits
+                videos[ind]['boxes']  = all_boxes
+
+            return jsonify({
+                'success': True,
+                'start_index': start_index,
+                'total_videos': len(videos),
+                'annotatedFrame': annotatedFrame,
+                'videos': videos
+            })
+
+
+        @self.app.route('/api_yes_no/video/<int:video_index>/frame/<int:frame_index>')
+        def yes_no_get_frame(video_index, frame_index):
+            """Serve a specific frame from a video"""
+            files = glob.glob(self.YES_NO_VIDEO_BASE_PATH+'/*')
+            files.sort()
+
+            folder_name = files[video_index].split('/',1)[1]
+
+            frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            folder_path = os.path.join(self.YES_NO_VIDEO_BASE_PATH, folder_name)
+
+            if not os.path.exists(os.path.join(folder_path, frame_name)):
+                return jsonify({'error': 'Frame not found'}), 404
+
+            return send_from_directory(folder_path, frame_name)
+
+        @self.app.route('/api_yes_no/save-annotation', methods=['POST'])
+        def yes_no_save_annotation():
+            """Save a single annotation to MongoDB"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+
+            try:
+                data = request.json
+                data['annotator_id'] = session.get('annotator_id', 'unknown')
+                data['created_at']   = datetime.utcnow()
+                data['updated_at']   = datetime.utcnow()
+
+                result = self.yes_no_annotations_collection.insert_one(data)
+
+                print(f"✅ Annotation saved with ID: {result.inserted_id}")
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Annotation saved to MongoDB',
+                    'annotation_id': str(result.inserted_id)
+                })
+            except Exception as e:
+                print(f"❌ Error saving annotation: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'success': False, 'error': str(e)}), 500
+
        
        
         @self.app.route('/api/save-all-annotations', methods=['POST'])

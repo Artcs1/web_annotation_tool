@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Group Annotation Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .left-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .right-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+        
+        .video-progress {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .annotation-frame-section {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section-label {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .frame-canvas {
+            background: #1a1a1a;
+            cursor: crosshair;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            min-height: 400px;
+        }
+        
+        .frame-image {
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            object-fit: contain;
+            background: #000;
+            pointer-events: none;
+            user-drag: none;
+            -webkit-user-drag: none;
+            user-select: none;
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 3px solid #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+            border-radius: 5px;
+            z-index: 10;
+        }
+        
+        .box-label {
+            position: absolute;
+            top: -30px;
+            left: 0;
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 11;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.3s ease;
+        }
+        
+        .video-preview-section {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .video-canvas {
+            background: #1a1a1a;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .play-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .pause-btn {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+            color: white;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .frame-info {
+            color: #666;
+            font-size: 14px;
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+        
+        .playback-status {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .status-watched {
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+        }
+        
+        .status-not-watched {
+            color: #ff9800;
+            border: 2px solid #ff9800;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .selection-info {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .selection-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .selection-coords {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .box-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+
+        .pairwise-annotation-section {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+            margin-bottom: 20px;
+        }
+
+        .pairwise-annotation-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .pair-progress {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .pair-question {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .pair-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .pair-btn {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .yes-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .yes-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .no-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .no-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .keyboard-hint {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .submit-section {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-playing {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-paused {
+            background: #ff9800;
+        }
+        
+        .tip-text {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .video-scrubber {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .scrubber-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .keyboard-shortcuts {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .keyboard-shortcuts h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .shortcut-key {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .instructions-section {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .instructions-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .instructions-section ol {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .instructions-section li {
+            margin-bottom: 8px;
+        }
+
+        .instructions-section strong {
+            color: #667eea;
+        }
+
+        .phase-banner {
+            background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(46, 125, 50, 0.35);
+            border: 3px solid #1b5e20;
+        }
+
+        .phase-banner h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .phase-banner p {
+            font-size: 16px;
+            margin: 0;
+            font-weight: 500;
+            opacity: 0.95;
+        }
+
+        /* Tutorial Modal Styles */
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tutorial-overlay.hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .tutorial-modal {
+            background: white;
+            border-radius: 25px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.4s ease;
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .tutorial-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 25px 25px 0 0;
+            text-align: center;
+            position: relative;
+        }
+
+        .tutorial-header h2 {
+            font-size: 32px;
+            margin: 0;
+            font-weight: 800;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .tutorial-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 28px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .tutorial-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .tutorial-content {
+            padding: 30px;
+        }
+
+        .tutorial-step {
+            margin-bottom: 30px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tutorial-step:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .tutorial-step-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .tutorial-step-number {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 20px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .tutorial-step-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+        }
+
+        .tutorial-step-description {
+            color: #666;
+            line-height: 1.8;
+            font-size: 15px;
+            margin-left: 60px;
+        }
+
+        .tutorial-step-description ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .tutorial-step-description li {
+            margin: 8px 0;
+        }
+
+        .tutorial-step-description strong {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .tutorial-highlight {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            margin: 15px 0;
+        }
+
+        .tutorial-footer {
+            background: #f8f9fa;
+            padding: 25px 30px;
+            border-radius: 0 0 25px 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tutorial-button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tutorial-button-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .tutorial-button-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .tutorial-button-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .tutorial-button-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .help-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 5px 25px rgba(102, 126, 234, 0.5);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .help-button:hover {
+            transform: scale(1.1) rotate(15deg);
+            box-shadow: 0 8px 35px rgba(102, 126, 234, 0.7);
+        }
+
+        .tutorial-emoji {
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Tutorial Modal -->
+    <div class="tutorial-overlay" id="tutorialOverlay">
+        <div class="tutorial-modal">
+            <div class="tutorial-header">
+                <div class="tutorial-emoji">📚</div>
+                <h2>Welcome to the Annotation Tool!</h2>
+                <button class="tutorial-close" id="tutorialClose">×</button>
+            </div>
+            
+            <div class="tutorial-content">
+                <div class="tutorial-step">
+                    <div class="tutorial-step-header">
+                        <div class="tutorial-step-number">1</div>
+                        <h3 class="tutorial-step-title">Understanding the Interface</h3>
+                    </div>
+                    <div class="tutorial-step-description">
+                        The annotation tool has two main panels:
+                        <ul>
+                            <li><strong>Left Panel:</strong> Video playback controls and the annotation frame where boxes are displayed</li>
+                            <li><strong>Right Panel:</strong> Annotation controls and instructions</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="tutorial-step-header">
+                        <div class="tutorial-step-number">2</div>
+                        <h3 class="tutorial-step-title">Review the Bounding Boxes</h3>
+                    </div>
+                    <div class="tutorial-step-description">
+                        Pre-drawn boxes around people will be displayed on the annotation frame. Each box represents a detected person and is labeled as "Person 1", "Person 2", etc.
+                        <div class="tutorial-highlight">
+                            💡 <strong>Tip:</strong> You can watch the video preview to better understand who is interacting with whom.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="tutorial-step-header">
+                        <div class="tutorial-step-number">3</div>
+                        <h3 class="tutorial-step-title">Answer Pairwise Questions</h3>
+                    </div>
+                    <div class="tutorial-step-description">
+                        For each pair of people, you'll be asked: <strong>"Are these two people in the same group?"</strong>
+                        <ul>
+                            <li>Click <strong>"Yes"</strong> (or press <strong>Y</strong>) if they appear to be together</li>
+                            <li>Click <strong>"No"</strong> (or press <strong>N</strong>) if they appear to be in different groups</li>
+                        </ul>
+                        Continue until all pairs are annotated.
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="tutorial-step-header">
+                        <div class="tutorial-step-number">4</div>
+                        <h3 class="tutorial-step-title">Video Controls</h3>
+                    </div>
+                    <div class="tutorial-step-description">
+                        Use the video controls to help make your decisions:
+                        <ul>
+                            <li><strong>Play/Pause:</strong> Shift key</li>
+                            <li><strong>Next Frame:</strong> Right arrow (→)</li>
+                            <li><strong>Previous Frame:</strong> Left arrow (←)</li>
+                            <li><strong>Skip frames:</strong> Shift + Arrow keys</li>
+                            <li><strong>Scrubber:</strong> Drag to jump to any frame</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="tutorial-step">
+                    <div class="tutorial-step-header">
+                        <div class="tutorial-step-number">5</div>
+                        <h3 class="tutorial-step-title">Submit Your Annotation</h3>
+                    </div>
+                    <div class="tutorial-step-description">
+                        Once you've answered all pairwise questions, the <strong>"Submit Annotation"</strong> button will be enabled. Click it to save your work and move to the next video.
+                        <div class="tutorial-highlight">
+                            ✅ All your annotations are automatically saved to the database.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tutorial-footer">
+                <button class="tutorial-button tutorial-button-primary" id="tutorialStart">
+                    🚀 Start Annotating
+                </button>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="tutorialDontShow" style="cursor: pointer;">
+                    <span style="color: #666; font-size: 14px;">Don't show this again</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Button (floating) -->
+    <button class="help-button" id="helpButton" title="Show Tutorial">
+        ?
+    </button>
+
+    <div class="container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <div class="video-progress" id="videoProgress">
+                🎥 Video <span id="currentVideoNum">1</span> of <span id="totalVideoNum">?</span>. Frame: <span id="currentFrameNum">?</span>
+            </div>
+
+            <div class="annotation-frame-section">
+                <div class="section-label">🎯 Annotation Frame - Draw Selection Here</div>
+                <div class="frame-canvas" id="annotationCanvas">
+                    <img class="frame-image" id="annotationImage" src="" alt="Annotation Frame">
+                </div>
+            </div>
+            
+            <div class="video-preview-section">
+                <div class="section-label">🎬 Video Preview - Watch to Help Your Decision</div>
+                <div class="video-canvas" id="videoCanvas">
+                    <img class="frame-image" id="videoImage" src="" alt="Video Frame">
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn play-btn" id="playBtn">▶️ Play</button>
+                <button class="control-btn pause-btn" id="pauseBtn" style="display: none;">⏸️ Pause</button>
+                <div class="frame-info">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    Frame: <span id="frameCounter">1</span> / <span id="totalFrames">50</span>
+                </div>
+            </div>
+            
+            <div class="video-scrubber">
+                <input type="range" class="scrubber-slider" id="videoScrubber" min="0" max="49" value="0">
+            </div>
+            
+            <div class="playback-status" id="playbackStatus">
+                <span id="watchedStatus">⏸️ Video Not Watched</span>
+            </div>
+        </div>
+        
+        <!-- Right Panel -->
+        <div class="right-panel">
+
+            <h2 class="section-title">📝 Annotation Tool</h2>
+            
+            <div style="text-align: center; margin-bottom: 15px;">
+                <button class="tutorial-button tutorial-button-secondary" id="showGuidelinesBtn" style="display: inline-flex; align-items: center; gap: 8px;">
+                    📖 View Guidelines
+                </button>
+            </div>
+            
+            <div class="instructions-section">
+                <h3>📋 How to Annotate</h3>
+                <ol>
+                    <li>Review the boxes shown on the annotation image</li>
+                    <li>For each pair of people, decide if they are in the same group</li>
+                    <li>Click <strong>"Yes"</strong> if they're together, <strong>"No"</strong> if they're separate</li>
+                    <li>Use keyboard shortcuts <strong>Y</strong> for Yes, <strong>N</strong> for No</li>
+                    <li>Continue until all pairs are annotated</li>
+                    <li>Click <strong>"Submit Annotation"</strong> when done</li>
+                </ol>
+                <div class="tip-text" style="margin-top: 10px;">
+                    💡 <strong>Tip:</strong> Watch the video preview to better understand group dynamics and relationships.
+                </div>
+            </div>
+
+            <div class="pairwise-annotation-section">
+                <h3>👥 Group Annotation</h3>
+                <div class="pair-progress" id="pairProgress">Loading...</div>
+                <div class="pair-question" id="pairQuestion">Are these two people in the same group?</div>
+                
+                <div class="pair-buttons">
+                    <button class="pair-btn yes-btn" id="yesBtn">
+                        ✅ Yes - Same Group
+                    </button>
+                    <button class="pair-btn no-btn" id="noBtn">
+                        ❌ No - Different Groups
+                    </button>
+                </div>
+                
+                <div class="keyboard-hint">
+                    Keyboard: Press <span class="shortcut-key">Y</span> for Yes, <span class="shortcut-key">N</span> for No
+                </div>
+            </div>
+
+            <div class="submit-section">
+                <button class="submit-btn" id="submitBtn" disabled>Submit Annotation</button>
+            </div>
+            
+            <div class="selection-info">
+                <h3>🎯 Selection Areas (<span id="boxCount">0</span>)</h3>
+                <div class="selection-coords" id="selectionCoords">
+                    Click and drag on the annotation image to draw a box around a group
+                </div>
+            </div>
+           
+            <div class="keyboard-shortcuts">
+                <h4>⌨️ Keyboard Shortcuts</h4>
+                <div class="shortcut-item">
+                    <span>Yes (Same Group)</span>
+                    <span class="shortcut-key">Y</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>No (Different Groups)</span>
+                    <span class="shortcut-key">N</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Play/Pause</span>
+                    <span class="shortcut-key">Shift</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Next Frame</span>
+                    <span class="shortcut-key">→</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Previous Frame</span>
+                    <span class="shortcut-key">←</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Skip +5 Frames</span>
+                    <span class="shortcut-key">Shift + →</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Skip -5 Frames</span>
+                    <span class="shortcut-key">Shift + ←</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='yes_no_app.js') }}"></script>
+
+    <script>
+        // Tutorial Management
+        const TUTORIAL_SEEN_KEY = 'annotationTutorialSeen';
+        
+        class TutorialManager {
+            constructor() {
+                this.overlay = document.getElementById('tutorialOverlay');
+                this.closeBtn = document.getElementById('tutorialClose');
+                this.startBtn = document.getElementById('tutorialStart');
+                this.dontShowCheckbox = document.getElementById('tutorialDontShow');
+                this.helpButton = document.getElementById('helpButton');
+                this.guidelinesBtn = document.getElementById('showGuidelinesBtn');
+                
+                this.bindEvents();
+                this.checkFirstVisit();
+            }
+            
+            bindEvents() {
+                this.closeBtn.addEventListener('click', () => this.closeTutorial());
+                this.startBtn.addEventListener('click', () => this.closeTutorial());
+                this.helpButton.addEventListener('click', () => this.showTutorial());
+                this.guidelinesBtn.addEventListener('click', () => this.showTutorial());
+                
+                // Close on overlay click (but not modal click)
+                this.overlay.addEventListener('click', (e) => {
+                    if (e.target === this.overlay) {
+                        this.closeTutorial();
+                    }
+                });
+                
+                // ESC key to close
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && !this.overlay.classList.contains('hidden')) {
+                        this.closeTutorial();
+                    }
+                });
+            }
+            
+            checkFirstVisit() {
+                const hasSeenTutorial = sessionStorage.getItem(TUTORIAL_SEEN_KEY);
+                if (!hasSeenTutorial) {
+                    this.showTutorial();
+                }
+            }
+            
+            showTutorial() {
+                this.overlay.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+            
+            closeTutorial() {
+                this.overlay.classList.add('hidden');
+                document.body.style.overflow = ''; // Restore scrolling
+                
+                // Mark as seen if checkbox is checked
+                if (this.dontShowCheckbox.checked) {
+                    sessionStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
+                } else {
+                    // Still mark as seen for this session, but will show again on new session
+                    sessionStorage.setItem(TUTORIAL_SEEN_KEY, 'session');
+                }
+            }
+        }
+        
+        // Initialize tutorial manager
+        const tutorialManager = new TutorialManager();
+    </script>
+</body>
+</html>
