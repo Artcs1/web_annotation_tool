@@ -923,8 +923,8 @@
                 <h3>📋 How to Annotate</h3>
                 <ol>
                     <li>Review the boxes shown on the annotation image</li>
-                    <li>For each pair of people, decide if they are in the same group</li>
-                    <li>Click <strong>"Yes"</strong> if they're together, <strong>"No"</strong> if they're separate, <strong>"Unsure"</strong> if unclear, or <strong>"Incomplete Group"</strong> if a member is missing.</li>
+                    <li>For each highlighted set of people (one or more individuals), decide if they are in the same group.</li>
+                    <li>Click <strong>"Yes"</strong> if they form one complete group, <strong>"No"</strong> if they're separate, <strong>"Unsure"</strong> if unclear, or <strong>"Incomplete Group"</strong> if a member is missing.</li>
                     <li>Use keyboard shortcuts: <strong>Y</strong> (Yes), <strong>N</strong> (No), <strong>U</strong> (Unsure), <strong>I</strong> (Incomplete).</li>
                     <li>Continue until all pairs are annotated</li>
                     <li>Click <strong>"Submit Annotation"</strong> when done</li>
@@ -937,12 +937,12 @@
             <div class="pairwise-annotation-section">
                 <h3>👥 Group Annotation</h3>
                 <div class="pair-progress" id="pairProgress">Loading...</div>
-                <div class="pair-question" id="pairQuestion">Are these two people in the same group?</div>
+                <div class="pair-question" id="pairQuestion">Are all the annotated persons in the same group?</div>
                
                 <div class="pair-buttons">
 
                     <button class="pair-btn yes-btn" id="yesBtn">
-                        ✅ Yes - Same Group
+                        ✅ Yes - One Complete Group
                     </button>
                     <button class="pair-btn no-btn" id="noBtn">
                         ❌ No - Different Groups
