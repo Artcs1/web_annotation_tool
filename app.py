@@ -29,7 +29,7 @@ class VideoAnnotationApp:
         
         self.MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
         self.MONGO_DB = 'video_annotations'
-        self.annotator_per_clip = 5
+        self.annotator_per_clip = 3
         self.number_of_clips = 15
         self.VIDEO_BASE_PATH = 'videos'
         self.YES_NO_VIDEO_BASE_PATH = 'yes_no_videos'
