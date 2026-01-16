@@ -39,6 +39,7 @@ class VideoAnnotationApp:
         self.FRAME_PADDING = 4
         self.FRAME_COUNT_PADDING = 5
         self.choices_annotatedframe = [1,21,41]
+        self.global_idx = 0
 
         # MongoDB setup
         try:
@@ -57,13 +58,14 @@ class VideoAnnotationApp:
             boxes = []
             for i, group in enumerate(groups):
                 boxes.append({
-                    'id': f'box_{i}',
+                    'id': f'box_{str(self.global_idx).zfill(5)}',
                     'tl_x1': group[0],
                     'tl_y1': group[1],
                     'br_x1': group[2],
                     'br_y1': group[3],
                     'confidence': random.randint(1, 5)  # Random confidence 1-5
                 })
+                self.global_idx+=1
 
             return boxes
 
