@@ -120,10 +120,12 @@ class VideoAnnotationTool {
         this.speedButtons = document.querySelectorAll('.speed-btn');
         
         // Pairwise annotation elements
-        this.yesBtn = document.getElementById('yesBtn');
-        this.noBtn = document.getElementById('noBtn');
-        this.pairProgress = document.getElementById('pairProgress');
-        this.pairQuestion = document.getElementById('pairQuestion');
+        this.yesBtn        = document.getElementById('yesBtn');
+        this.noBtn         = document.getElementById('noBtn');
+        this.unsureBtn     = document.getElementById('unsureBtn');
+        this.incompleteBtn = document.getElementById('incompleteBtn');
+        this.pairProgress  = document.getElementById('pairProgress');
+        this.pairQuestion  = document.getElementById('pairQuestion');
     }
     
     bindEvents() {
@@ -133,8 +135,10 @@ class VideoAnnotationTool {
         this.submitBtn.addEventListener('click', () => this.submitAnnotation());
         
         // Pairwise annotation buttons
-        this.yesBtn.addEventListener('click', () => this.answerPair(true));
-        this.noBtn.addEventListener('click', () => this.answerPair(false));
+        this.yesBtn.addEventListener('click', () => this.answerPair("True"));
+        this.noBtn.addEventListener('click', () => this.answerPair("False"));
+        this.unsureBtn.addEventListener('click', () => this.answerPair("Unsure"));
+        this.incompleteBtn.addEventListener('click', () => this.answerPair("Incomplete Group"));
         
         this.videoScrubber.addEventListener('input', (e) => {
             const previousFrame = this.currentFrame;
@@ -196,13 +200,24 @@ class VideoAnnotationTool {
                 case 'y':
                 case 'Y':
                     e.preventDefault();
-                    this.answerPair(true);
+                    this.answerPair("True");
                     break;
                 case 'n':
                 case 'N':
                     e.preventDefault();
-                    this.answerPair(false);
+                    this.answerPair("False");
                     break;
+                case 'u':
+                case 'U':
+                    e.preventDefault();
+                    this.answerPair("Unsure");
+                    break;
+                case 'i':
+                case 'I':
+                    e.preventDefault();
+                    this.answerPair("Incomplete Group");
+                    break;
+ 
             }
         });
         
@@ -296,6 +311,8 @@ class VideoAnnotationTool {
         // Hide yes/no buttons
         this.yesBtn.style.display = 'none';
         this.noBtn.style.display = 'none';
+        this.unsureBtn.style.display = 'none';
+        this.incompleteBtn.style.display = 'none';
     }
     
     loadVideo(index) {
@@ -338,19 +355,34 @@ class VideoAnnotationTool {
         console.log(this.currentSplits)
         console.log(max_size)
         
-        // Initialize pairwise annotation if there are boxes
-        if (max_size >= 2) {
+        if (max_size >= 1) {
             this.generateBoxPairs();
             this.showCurrentPair();
             this.yesBtn.style.display = 'inline-flex';
             this.noBtn.style.display = 'inline-flex';
+            this.unsureBtn.style.display = 'inline-flex';
+            this.incompleteBtn.style.display = 'inline-flex';
+
+            this.yesBtn.style.alignItems = 'center';
+            this.yesBtn.style.justifyContent = 'center';
+
+            this.noBtn.style.alignItems = 'center';
+            this.noBtn.style.justifyContent = 'center';
+
+            this.unsureBtn.style.alignItems = 'center';
+            this.unsureBtn.style.justifyContent = 'center';
+
+            this.incompleteBtn.style.alignItems = 'center';
+            this.incompleteBtn.style.justifyContent = 'center';
+
             this.submitBtn.disabled = true;
         } else {
-            // No pairs to annotate
             this.pairProgress.textContent = this.currentBoxes.length === 0 ? 'No boxes to annotate' : 'Only 1 box - no pairs to compare';
             this.pairQuestion.textContent = 'You can submit directly.';
             this.yesBtn.style.display = 'none';
             this.noBtn.style.display = 'none';
+            this.unsureBtn.style.display = 'none';
+            this.incompleteBtn.style.display = 'none';
             this.submitBtn.disabled = false;
         }
     }

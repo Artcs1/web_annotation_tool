@@ -145,6 +145,7 @@
             min-height: 300px;
         }
         
+
         .controls {
             display: flex;
             gap: 15px;
@@ -288,10 +289,31 @@
             margin-bottom: 20px;
         }
 
+        .not-sure-btn {
+            background: linear-gradient(45deg, #FFA726, #FB8C00);
+            color: white;
+        }
+        
+        .not-sure-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 167, 38, 0.4);
+        }
+        
+        .incomplete-btn {
+            background: linear-gradient(45deg, #42A5F5, #1E88E5);
+            color: white;
+        }
+        
+        .incomplete-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 165, 245, 0.4);
+        }
+
         .pair-buttons {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            margin-bottom: 5px;
         }
 
         .pair-btn {
@@ -792,6 +814,8 @@
                         <ul>
                             <li>Click <strong>"Yes"</strong> (or press <strong>Y</strong>) if they appear to be together</li>
                             <li>Click <strong>"No"</strong> (or press <strong>N</strong>) if they appear to be in different groups</li>
+                            <li>Click <strong>"Unsure"</strong> (or press <strong>U</strong>) if you are not sure whether they form a group.</li>
+                            <li>Click <strong>"Incomplete Group"</strong> (or press <strong>I</strong>) if a group appears to be missing a member.</li>
                         </ul>
                         Continue until all pairs are annotated.
                     </div>
@@ -900,8 +924,8 @@
                 <ol>
                     <li>Review the boxes shown on the annotation image</li>
                     <li>For each pair of people, decide if they are in the same group</li>
-                    <li>Click <strong>"Yes"</strong> if they're together, <strong>"No"</strong> if they're separate</li>
-                    <li>Use keyboard shortcuts <strong>Y</strong> for Yes, <strong>N</strong> for No</li>
+                    <li>Click <strong>"Yes"</strong> if they're together, <strong>"No"</strong> if they're separate, <strong>"Unsure"</strong> if unclear, or <strong>"Incomplete Group"</strong> if a member is missing.</li>
+                    <li>Use keyboard shortcuts: <strong>Y</strong> (Yes), <strong>N</strong> (No), <strong>U</strong> (Unsure), <strong>I</strong> (Incomplete).</li>
                     <li>Continue until all pairs are annotated</li>
                     <li>Click <strong>"Submit Annotation"</strong> when done</li>
                 </ol>
@@ -914,18 +938,26 @@
                 <h3>👥 Group Annotation</h3>
                 <div class="pair-progress" id="pairProgress">Loading...</div>
                 <div class="pair-question" id="pairQuestion">Are these two people in the same group?</div>
-                
+               
                 <div class="pair-buttons">
+
                     <button class="pair-btn yes-btn" id="yesBtn">
                         ✅ Yes - Same Group
                     </button>
                     <button class="pair-btn no-btn" id="noBtn">
                         ❌ No - Different Groups
                     </button>
+                    <button class="pair-btn not-sure-btn" id="unsureBtn">
+                        ❓ Unsure
+                    </button>
+                    <button class="pair-btn incomplete-btn" id="incompleteBtn">
+                        ⚠️ Incomplete Group
+                    </button>
                 </div>
-                
+                                
                 <div class="keyboard-hint">
-                    Keyboard: Press <span class="shortcut-key">Y</span> for Yes, <span class="shortcut-key">N</span> for No
+                    Keyboard: Press <span class="shortcut-key">Y</span> for Yes, <span class="shortcut-key">N</span> for No, <span class="shortcut-key">U</span> for Unsure, <span class="shortcut-key">I</span> for Incomplete Group
+
                 </div>
             </div>
 
