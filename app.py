@@ -211,16 +211,11 @@ class VideoAnnotationApp:
                 ann_results = []
 
             annotated_clips = [(result['globalIndex']-1, result['videoInfo']['annotationFrame']) for result in ann_results]
-            print(annotated_clips)
             annotated_block = [(ann[0]//self.number_of_clips, ann[1]) for ann in annotated_clips]
-            print(annotated_block)
 
             counter = Counter(annotated_block)
             unique = list(counter.keys())
             counts = list(counter.values())
-
-            print(unique)
-            print(counts)
 
             ann_completed   = [u for u, c in zip(unique, counts) if c == self.number_of_clips] 
             ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
@@ -301,6 +296,8 @@ class VideoAnnotationApp:
             if not os.path.exists(os.path.join(folder_path, frame_name)):
                 return jsonify({'error': 'Frame not found'}), 404
             
+            print(folder_path)
+            print(frame_name)
             return send_from_directory(folder_path, frame_name)
         
         @self.app.route('/api/validation/video/<int:video_index>/frame/<int:frame_index>')
@@ -353,8 +350,6 @@ class VideoAnnotationApp:
                 traceback.print_exc()
                 return jsonify({'success': False, 'error': str(e)}), 500
        
-
-        
         @self.app.route('/api/save-annotation', methods=['POST'])
         def save_annotation():
             """Save a single annotation to MongoDB"""
@@ -459,6 +454,7 @@ class VideoAnnotationApp:
 
             for ind, video in enumerate(videos):
 
+                self.global_idx = 0
                 group_file = f"groups/{annotatedFrame}_{video['folder']}.pkl"
                 with open(group_file, 'rb') as f:
                     groups = pickle.load(f)

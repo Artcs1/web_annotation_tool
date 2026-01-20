@@ -5,7 +5,7 @@ class VideoAnnotationTool {
         this.globalVideoIndex = 0;
         this.totalVideos = 0;
         this.videos = [];
-        this.totalFrames = 50;
+        this.totalFrames = 49;
         this.frameRate = 5;
 
         this.NORMALIZED_WIDTH = 1920;
@@ -840,7 +840,7 @@ class VideoAnnotationTool {
     }
     
     updateDisplay() {
-        this.frameCounter.textContent = this.currentFrame + 1;
+        this.frameCounter.textContent = this.currentFrame;
         this.totalFramesEl.textContent = this.totalFrames;
         this.videoScrubber.max = this.totalFrames - 1;
         this.videoScrubber.value = this.currentFrame;
@@ -920,7 +920,7 @@ class VideoAnnotationTool {
             groups: boxes,
             deletedGroups: deletedBoxes, // Include deleted boxes
             videoInfo: {
-                totalFrames: this.totalFrames,
+                totalFrames: this.totalFrames + 1,
                 annotationFrame: this.annotatedFrame,
                 coordinateSystem: 'normalized',
                 normalizedWidth: this.NORMALIZED_WIDTH,
