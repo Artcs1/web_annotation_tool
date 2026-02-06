@@ -883,9 +883,18 @@ class VideoAnnotationApp:
                 traceback.print_exc()
                 return jsonify({'success': False, 'error': str(e)}), 500
 
-        
+        ####################
         ### MISCELANIOUS ###       
-       
+        ####################
+
+        @self.app.route('/my-annotator-id')
+        def show_annotator_id():
+            """Display the annotator ID in a user-friendly page"""
+            if 'annotator_id' not in session:
+                session['annotator_id'] = str(uuid.uuid4())
+                session.permanent = True
+            return render_template('annotator_id.html', annotator_id=session['annotator_id'])
+         
         @self.app.route('/api/save-all-annotations', methods=['POST'])
         def save_all_annotations():
             """Save all annotations in a single file"""

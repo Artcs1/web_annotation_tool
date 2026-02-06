@@ -664,7 +664,9 @@ class VideoAnnotationTool {
 
             box.element.style.pointerEvents = 'none';
 
-            if (box.labelElement) box.labelElement.style.pointerEvents = 'auto';
+            if (box.labelElement && !box.labelElement.classList.contains('hidden')) {
+                box.labelElement.style.pointerEvents = 'auto';
+            }
             if (box.confidenceContainer) box.confidenceContainer.style.pointerEvents = 'auto';
             const deleteBtn = box.element.querySelector('.box-delete');
             if (deleteBtn) deleteBtn.style.pointerEvents = 'auto';
