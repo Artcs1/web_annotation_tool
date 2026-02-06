@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Annotator ID</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .id-container {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        .id-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .id-value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .copy-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .copy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+        
+        .copy-btn.copied {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: left;
+            margin-bottom: 20px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .info-box p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .back-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+        }
+        
+        .success-message {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🆔 Your Annotator ID</h1>
+        <p class="subtitle">This unique ID identifies all your annotations</p>
+        
+        <div class="id-container">
+            <div class="id-label">Your Unique Annotator ID</div>
+            <div class="id-value" id="annotatorId">{{ annotator_id }}</div>
+            <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">
+                📋 Copy ID to Clipboard
+            </button>
+            <div class="success-message" id="successMessage">
+                ✅ Copied to clipboard!
+            </div>
+        </div>
+        
+        <div class="info-box">
+            <h3>ℹ️ About Your ID</h3>
+            <p><strong>What is this?</strong> This is your unique annotator identifier that is automatically assigned to you when you first visit the annotation tool.</p>
+            <p><strong>Why do I need it?</strong> All your annotations are linked to this ID, making it easy to track your contributions and ensure data quality.</p>
+            <p><strong>Is it permanent?</strong> Yes! Your ID is stored in your browser session and will persist for 180 days.</p>
+            <p><strong>Can I share it?</strong> You can save this ID for your records or share it with the research team if needed.</p>
+        </div>
+        
+        <a href="/annotation" class="back-btn">← Back to Annotation Tool</a>
+    </div>
+    
+    <script>
+        function copyToClipboard() {
+            const idValue = document.getElementById('annotatorId').textContent;
+            const copyBtn = document.getElementById('copyBtn');
+            const successMessage = document.getElementById('successMessage');
+            
+            navigator.clipboard.writeText(idValue).then(() => {
+                // Show success message
+                successMessage.style.display = 'block';
+                copyBtn.classList.add('copied');
+                copyBtn.innerHTML = '✅ Copied!';
+                
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                    copyBtn.classList.remove('copied');
+                    copyBtn.innerHTML = '📋 Copy ID to Clipboard';
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>
