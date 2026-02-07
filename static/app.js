@@ -658,16 +658,30 @@ class VideoAnnotationTool {
                 });
             }
 
+
             if (box.labelElement) {
                 box.labelElement.classList.add('hidden');
+                // Ensure hidden label and its contents don't block mouse events
+                box.labelElement.style.pointerEvents = 'none';
             }
 
+            // Disable pointer events on the entire box element
             box.element.style.pointerEvents = 'none';
 
+            // Re-enable pointer events only for interactive elements (not for hidden labels)
             if (box.labelElement && !box.labelElement.classList.contains('hidden')) {
                 box.labelElement.style.pointerEvents = 'auto';
+                // Only enable confidence buttons if label is visible
+                if (box.confidenceContainer) {
+                    box.confidenceContainer.style.pointerEvents = 'auto';
+                }
+            } else {
+                // Explicitly disable confidence container when label is hidden
+                if (box.confidenceContainer) {
+                    box.confidenceContainer.style.pointerEvents = 'none';
+                }
             }
-            if (box.confidenceContainer) box.confidenceContainer.style.pointerEvents = 'auto';
+
             const deleteBtn = box.element.querySelector('.box-delete');
             if (deleteBtn) deleteBtn.style.pointerEvents = 'auto';
             Object.values(box.handles).forEach(handle => {

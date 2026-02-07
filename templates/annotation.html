@@ -168,9 +168,15 @@
             transition: opacity 0.3s ease;
         }
 
+
+
         .box-label.hidden {  /* ← ADDED THIS ENTIRE CLASS */
             opacity: 0;
             pointer-events: none;
+        }
+
+        .box-label.hidden * {
+            pointer-events: none !important;
         }
         
         .box-confidence-container {
