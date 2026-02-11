@@ -203,8 +203,8 @@ class VideoAnnotationApp:
             unique = list(counter.keys())
             counts = list(counter.values())
 
-            ann_completed   = [u for u, c in zip(unique, counts) if c == self.number_of_clips] 
-            ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
+            ann_completed   = [u for u, c in zip(unique, counts) if c >= self.number_of_clips] 
+            ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c < self.number_of_clips]
             
             # Get video files
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
@@ -229,7 +229,11 @@ class VideoAnnotationApp:
             num_videos   = len(videos)
             num_blocks   = num_videos//self.number_of_clips
 
+            #print(len(ann_incompleted))
+            #print(len(ann_completed))
+
             if len(ann_incompleted) == 0:
+
                 possible_choices = [(block, f) for block in np.arange(num_blocks) for f in self.choices_annotatedframe]
                 global_counts = [self.annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips), "videoInfo.annotationFrame": f}) for p, f in possible_choices]
                 possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]  
@@ -248,8 +252,8 @@ class VideoAnnotationApp:
                         break
 
             else:
-
-
+                
+                #print(ann_incompleted)
                 possible_choices = [p[0][0] for p in ann_incompleted]
                 possible_frames =  [p[0][1] for p in ann_incompleted]
                 left_in = [p[1] for p in ann_incompleted]
