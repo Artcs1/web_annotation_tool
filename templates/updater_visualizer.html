@@ -397,6 +397,48 @@
             box-shadow: none;
         }
         
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .skip-btn {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+        
+        .skip-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .next-clip-btn {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+        
+        .next-clip-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+        
         .status-indicator {
             display: inline-block;
             width: 12px;
@@ -659,34 +701,10 @@
         <div class="right-panel">
 
             <div class="phase-banner">
-                <h1>ANNOTATION PHASE </h1>
-                <p>Congrats!!! You pass the validation phase. This is our actual annotation tool, each submission will be recorded.</p>
+                <h1>UPDATER AND VISUALIZER</h1>
             </div>
 
-            <h2 class="section-title">📝 Annotation Tool</h2>
-            
-            <div class="instructions-section">
-                <h3>📋 How to Annotate</h3>
-                <div class="focus-text" style="margin-top: 10px;">
-                    💡 <strong>Task:</strong> Label a group when two or more people clearly move together or interact over time. Do not label people as a group if they are only briefly close due to crowding and show no shared movement or interaction.<br><br>
-                    <strong> Group Example: </strong> A family walking down a sidewalk.<br>
-                    <strong> Group Example: </strong> Two friends chatting while moving through a market.<br>
-                    <strong> Group Example: </strong> A customer and a street vendor engaged in a short interaction.<br>
-                    <strong> Not Group Example: </strong> People who are briefly close only because of crowding and show no shared movement or interaction. <br><br>
-                </div>
- 
-                <ol>
-                    <li>Click and drag on the annotation image to draw a box around a group</li>
-                    <li>Draw a box around a group on the image</li>
-                    <li>Click a <strong>number button (1-5)</strong> above the box to rate confidence</li>
-                    <li>Drag corners to resize, click × to delete</li>
-                    <li>Repeat for all groups in the video</li>
-                    <li>Click <strong>"Submit Annotation"</strong> when done</li>
-                </ol>
-                <div class="tip-text" style="margin-top: 10px;">
-                    💡 <strong>Tip:</strong> You can submit without boxes to skip a video if no groups are present.
-                </div>
-           </div>
+            <h2 class="section-title">📝 Updater and Visualizer Tool</h2>
             
             <div class="selection-info">
                 <h3>🎯 Selection Areas (<span id="boxCount">0</span>)</h3>
@@ -696,7 +714,11 @@
             </div>
             
             <div class="submit-section">
-                <button class="submit-btn" id="submitBtn" disabled>Submit Annotation</button>
+                <button class="submit-btn" id="submitBtn" disabled>Update Annotation</button>
+                <div class="nav-buttons">
+                    <button class="skip-btn" id="skipVideoBtn">⏭️ Skip Video</button>
+                    <button class="next-clip-btn" id="nextClipBtn">🎬 Next Clip</button>
+                </div>
             </div>
 
             <div class="confidence-guidelines">
@@ -750,6 +772,10 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        const CLIP_NAME = "{{ clip_name }}";
+        const START_FRAME = {{ frame }};
+    </script>
+    <script src="{{ url_for('static', filename='updater_visualizer.js') }}"></script>
 </body>
 </html>

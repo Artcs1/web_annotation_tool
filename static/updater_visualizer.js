@@ -1,6 +1,10 @@
 // Enhanced VideoAnnotationTool with comprehensive timestamp tracking
 class VideoAnnotationTool {
     constructor() {
+        this.clipName = CLIP_NAME;
+        this.frame = START_FRAME;
+        this.database_annotatorId = null;
+
         this.currentVideoIndex = 0;
         this.globalVideoIndex = 0;
         this.totalVideos = 0;
@@ -74,7 +78,7 @@ class VideoAnnotationTool {
 
     async loadVideos() {
         try {
-            const response = await fetch('/api/detect-videos');
+            const response = await fetch(`/updater_visualizer/detect-videos/${this.clipName}/${this.frame}`);
             const data = await response.json();
             
             if (data.success) {
@@ -117,6 +121,8 @@ class VideoAnnotationTool {
         this.boxCount = document.getElementById('boxCount');
         this.videoScrubber = document.getElementById('videoScrubber');
         this.speedButtons = document.querySelectorAll('.speed-btn');
+        this.skipVideoBtn = document.getElementById('skipVideoBtn');
+        this.nextClipBtn = document.getElementById('nextClipBtn');
 
     }
     
@@ -143,6 +149,8 @@ class VideoAnnotationTool {
         });
         
         this.submitBtn.addEventListener('click', () => this.submitAnnotation());
+        this.skipVideoBtn.addEventListener('click', () => this.skipVideo());
+        this.nextClipBtn.addEventListener('click', () => this.nextClip());
         
         // Scrubber controls with timestamp tracking
         this.videoScrubber.addEventListener('input', (e) => {
@@ -211,6 +219,98 @@ class VideoAnnotationTool {
         window.addEventListener('resize', () => this.repositionAllBoxes());
         this.annotationImage.addEventListener('load', () => this.repositionAllBoxes());
     }
+
+    loadExistingAnnotations(annotationData) {
+        console.log('Loading existing annotations:', annotationData);
+        
+        // Clear any existing boxes first
+        this.clearAllBoxes();
+        
+        // Load groups (active bounding boxes)
+        if (annotationData.groups && Array.isArray(annotationData.groups)) {
+            annotationData.groups.forEach((group, index) => {
+                this.createBoxFromData(group, index);
+            });
+        }
+        
+        // Optionally load deleted groups for reference (if needed)
+        if (annotationData.deletedGroups && Array.isArray(annotationData.deletedGroups)) {
+            this.deletedBoxes = annotationData.deletedGroups.map(group => 
+                this.reconstructBoxObject(group, true)
+            );
+        }
+        
+        // Update UI
+        this.updateSelectionInfo();
+        this.checkSubmitReady();
+        this.repositionAllBoxes();
+    }
+
+    createBoxFromData(groupData, index) {
+        // Extract bbox coordinates: [x1, y1, x2, y2]
+        const [x1, y1, x2, y2] = groupData.bbox;
+    
+        // Generate unique ID (use timestamp or current time)
+        const boxId = Date.now() + index; // Ensure unique IDs
+    
+        // Create the box object matching the existing structure
+        const box = {
+            id: boxId,
+            startX: x1,
+            startY: y1,
+            endX: x2,
+            endY: y2,
+            element: this.createBoxElement(),
+            createdAt: groupData.createdAt || new Date().toISOString(),
+            lastModified: groupData.lastModified || new Date().toISOString(),
+            modificationHistory: groupData.modificationHistory || [],
+            confidence: groupData.confidence !== null && groupData.confidence !== undefined 
+                        ? parseInt(groupData.confidence) 
+                        : null
+        };
+    
+        // Add the box to the canvas DOM
+        this.annotationCanvas.appendChild(box.element);
+    
+        // Add to selectionBoxes array BEFORE adding handles (so the index is correct)
+        this.selectionBoxes.push(box);
+    
+        // Add interactive handles, labels, and controls (pass index for proper labeling)
+        this.addBoxHandles(box, this.selectionBoxes.length);
+    
+        // Position the box on the canvas
+        this.updateBoxPosition(box);
+    
+        // Set the confidence rating if it exists (with a small delay to ensure DOM is ready)
+        if (box.confidence !== null && box.confidence !== undefined) {
+            // Use setTimeout to ensure the DOM elements are fully created
+            setTimeout(() => {
+                this.setBoxRating(box.id, box.confidence);
+            }, 0);
+        }
+    
+        console.log(`Created box ${index + 1}:`, box);
+    }
+
+    reconstructBoxObject(groupData, isDeleted = false) {
+        const [x1, y1, x2, y2] = groupData.bbox;
+   
+        console.log(groupData)
+        return {
+            id: Date.now() + Math.random(),
+            startX: x1,
+            startY: y1,
+            endX: x2,
+            endY: y2,
+            createdAt: groupData.createdAt || new Date().toISOString(),
+            lastModified: groupData.lastModified || new Date().toISOString(),
+            modificationHistory: groupData.modificationHistory || [],
+            confidence: groupData.confidence || null,
+            isDeleted: isDeleted
+        };
+    }
+    
+
     
     loadVideo(index) {
         if (index >= this.totalVideos) {
@@ -225,8 +325,15 @@ class VideoAnnotationTool {
 
         const video = this.videos[index];
 
+        this.database_annotatorId = video.annotator_id
         this.videoFolderName.textContent = video.folder;
-
+        if (video.annotation){
+            this.loadExistingAnnotations(video.annotation);
+        }
+        else{
+            this.clearAllBoxes();
+        }
+        //console.log(this.selectionBoxes[0]['startX'])
         // NEW: Reset video action tracking for new video
         this.videoActionHistory = [];
         this.videoLoadTime = new Date().toISOString();
@@ -240,7 +347,7 @@ class VideoAnnotationTool {
         this.annotationImage.src = `/api/video/${video.index}/frame/${this.annotatedFrame}`;
         this.loadVideoFrame(video.index, 0);
         
-        this.clearAllBoxes();
+        //this.clearAllBoxes();
         this.resetVideoState();
         this.updateDisplay();
     }
@@ -363,7 +470,7 @@ class VideoAnnotationTool {
             });
             
             this.selectionBoxes.push(this.currentBox);
-            this.addBoxHandles(this.currentBox);
+            this.addBoxHandles(this.currentBox, this.selectionBoxes.length);  // Pass 1-based index
             this.updateSelectionInfo();
         }
         
@@ -378,15 +485,20 @@ class VideoAnnotationTool {
         return box;
     }
     
-    addBoxHandles(box) {
-        const boxIndex = this.selectionBoxes.length;
-        box.confidence = null;
+    addBoxHandles(box, boxIndex = null) {
+        // Use provided index or calculate from current array length
+        if (boxIndex === null) {
+            boxIndex = this.selectionBoxes.length;
+        }
+        
+        if (!box.confidence)
+            box.confidence = null;
         
         const label = document.createElement('div');
         label.className = 'box-label';
         
         const groupText = document.createElement('span');
-        groupText.textContent = `Group ${boxIndex}`;
+        groupText.textContent = `Group ${boxIndex}`;  // Already 1-based from caller
         label.appendChild(groupText);
         
         const confidenceContainer = document.createElement('div');
@@ -957,7 +1069,7 @@ class VideoAnnotationTool {
             if (this.currentVideoIndex < this.totalVideos - 1) {
                 this.loadVideo(this.currentVideoIndex + 1);
             } else {
-                window.location.href = "/thank_you";
+                window.location.href = "/visualizer_thank_you";
             }
         } catch (error) {
             console.error('Error saving annotation:', error);
@@ -967,13 +1079,52 @@ class VideoAnnotationTool {
 
     async saveAnnotation(annotation) {
         try {
-            await fetch('/api/save-annotation', {
+            await fetch(`/updater_visualizer/update-annotation/${this.database_annotatorId}/${this.clipName}/${this.frame}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(annotation)
             });
         } catch (error) {
             console.error('Error saving annotation:', error);
+        }
+    }
+    
+    skipVideo() {
+        // Skip to next video without saving annotations
+        if (this.isPlaying) {
+            this.pause();
+        }
+        
+        // Log the skip action
+        this.logVideoAction('video_skipped', {
+            reason: 'user_skip',
+            boxesPresent: this.selectionBoxes.length
+        });
+        
+        if (this.currentVideoIndex < this.totalVideos - 1) {
+            this.loadVideo(this.currentVideoIndex + 1);
+        } else {
+            alert('This is the last video in the current clip.');
+        }
+    }
+    
+    nextClip() {
+        // Navigate to the next clip folder
+        if (this.isPlaying) {
+            this.pause();
+        }
+        
+        // Extract the clip number from current clip name (e.g., "clip_0004" -> 4)
+        const match = this.clipName.match(/clip_(\d+)/);
+        if (match) {
+            const currentClipNum = parseInt(match[1]);
+            const nextClipNum = currentClipNum + 1;
+            const nextClipName = `clip_${String(nextClipNum).padStart(4, '0')}`;
+            
+            // Navigate to the next clip with the same frame
+            window.location.href = `/updater_visualizer/${nextClipName}/${this.frame}`;
+        } else {
+            alert('Unable to determine next clip. Current clip format is not recognized.');
         }
     }
     

@@ -46,7 +46,7 @@ class VideoAnnotationApp:
         self.BASE_DIR = Path(__file__).parent
         self.VIDEOS_DIR = self.BASE_DIR / "videos"
         self.ANNOTATIONS_FILE = self.BASE_DIR / "coarse_group" / "all_annotations.json"
-        self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache.json"
+        self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
@@ -88,6 +88,19 @@ class VideoAnnotationApp:
                     'confidence': random.randint(1, 5)  # Random confidence 1-5
                 })
                 self.global_idx+=1
+
+            return boxes
+
+        def generate_visualizer_boxes(groups):
+
+            boxes = []
+            for i, group in enumerate(groups):
+                boxes.append({
+                    'startX': group[0],
+                    'startY': group[1],
+                    'endX': group[2],
+                    'endY': group[3],
+                })
 
             return boxes
 
@@ -230,6 +243,7 @@ class VideoAnnotationApp:
 
                 for f in reversed(self.choices_annotatedframe):
                     if (rand_number, f) in set(possible_choices):
+
                         annotatedFrame = f
                         break
 
@@ -322,7 +336,8 @@ class VideoAnnotationApp:
             for i, file in enumerate(files):
                 folder_path = file
                 folder_name = file.split('/',1)[1]#file[7:]
-                
+
+
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"
                     first_frame_path = os.path.join(folder_path, first_frame)
@@ -876,6 +891,130 @@ class VideoAnnotationApp:
                     'success': True,
                     'message': 'Annotation saved to MongoDB',
                     'annotation_id': str(result.inserted_id)
+                })
+            except Exception as e:
+                print(f"❌ Error saving annotation: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+
+        ####################
+        ### UPDATER-VISU ###
+        ####################
+
+        @self.app.route("/visualizer_thank_you")
+        def visualizer_thank_you():
+            return render_template("visualizer_thank_you.html")
+
+        @self.app.route("/updater_visualizer/<clip_name>/<int:frame>")
+        def updater_visualizer(clip_name, frame):
+            return render_template(
+                "updater_visualizer.html",
+                clip_name=clip_name,
+                frame=frame
+            )
+
+        @self.app.route('/updater_visualizer/detect-videos/<clip_name>/<int:frame>')
+        def uv_detect_videos(clip_name, frame):
+            """Detect available video folders"""
+
+            number_of_results = self.annotations_collection.count_documents({
+                "videoFolder": clip_name,
+                "videoInfo.annotationFrame": frame
+            })
+
+            number_of_anns = number_of_results
+
+            files = glob.glob(self.VIDEO_BASE_PATH+'/*')
+            files.sort()
+            videos = []
+
+            for i, file in enumerate(files):
+                folder_path = file
+                folder_name = file.split('/',1)[1]#file[7:]
+
+                if os.path.isdir(folder_path):
+                    first_frame = f"00001{self.FRAME_EXTENSION}"
+                    first_frame_path = os.path.join(folder_path, first_frame)
+
+                    if os.path.exists(first_frame_path):
+                        videos.append({
+                            'index': i,
+                            'folder': folder_name,
+                            'path': folder_path
+                        })
+
+            
+
+            idx = 0
+            for ind, video in enumerate(videos):
+                if video['folder'] == clip_name:
+                    idx = ind
+
+            import copy
+
+            videos = [copy.deepcopy(videos[idx]) for _ in range(number_of_anns)]
+
+            results = self.annotations_collection.find({
+                "videoFolder": clip_name,
+                "videoInfo.annotationFrame": frame
+            })
+
+
+            #results_list = list(results)
+
+            for idx, annotation in enumerate(results):
+
+                #print(annotation['annotator_id'])
+                #annotation_copy = copy.deepcopy(results_list[idx])
+            
+                print(annotation['annotator_id'])
+                annotation['_id'] = str(annotation['_id'])
+            
+                if 'created_at' in annotation and isinstance(annotation['created_at'], datetime):
+                    annotation['created_at'] = annotation['created_at'].isoformat()
+                if 'updated_at' in annotation and isinstance(annotation['updated_at'], datetime):
+                    annotation['updated_at'] = annotation['updated_at'].isoformat()
+            
+                videos[idx]['annotation'] = annotation
+                videos[idx]['annotator_id'] = annotation['annotator_id']           
+
+            
+            return jsonify({
+                'success': True,
+                'start_index': 0,
+                'total_videos': len(videos),
+                'annotatedFrame': frame,
+                'videos': videos
+            })
+
+        @self.app.route('/updater_visualizer/update-annotation/<annotator_id>/<clip_name>/<int:frame>', methods=['POST'])
+        def uv_update_annotation(annotator_id, clip_name, frame):
+            """Save a single annotation to MongoDB"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            
+            try:
+
+                 
+
+                data = request.json
+                #print(data)
+                print(annotator_id)
+                data['annotator_id'] = annotator_id or 'unknown'
+                data['created_at']   = datetime.utcnow()
+                data['updated_at']   = datetime.utcnow()
+                print(data)
+
+                result = self.annotations_collection.replace_one({"videoFolder": clip_name,"videoInfo.annotationFrame": frame, "annotator_id": annotator_id},data)
+
+                print(f"✅ Annotation saved with ID: {result.modified_count}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Annotation saved to MongoDB',
+                    'annotation_id': str(result.modified_count)
                 })
             except Exception as e:
                 print(f"❌ Error saving annotation: {e}")

@@ -113,6 +113,7 @@ class VideoAnnotationTool {
         this.playbackStatus = document.getElementById('playbackStatus');
         this.watchedStatus = document.getElementById('watchedStatus');
         this.currentFrameNum = document.getElementById('currentFrameNum');
+        this.videoFolderName = document.getElementById('videoFolderName');
         this.currentVideoNum = document.getElementById('currentVideoNum');
         this.totalVideoNum = document.getElementById('totalVideoNum');
         this.boxCount = document.getElementById('boxCount');
@@ -327,6 +328,7 @@ class VideoAnnotationTool {
         
         const video = this.videos[index];
 
+        this.videoFolderName.textContent = video.folder;
         this.videoActionHistory = [];
         this.videoLoadTime = new Date().toISOString();
         this.logVideoAction('video_loaded', {

@@ -29,6 +29,8 @@
             max-width: 1800px;
             width: 100%;
             margin: 0 auto;
+            align-items: stretch; /* ensure children stretch to equal height */
+            min-height: calc(100vh - 80px);
         }
         
         .left-panel {
@@ -43,8 +45,9 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-            overflow-y: auto;
-            max-height: calc(100vh - 100px);
+            /* allow the right panel to stretch and let inner blocks manage overflow */
+            overflow: visible;
+            height: 100%;
         }
         
         .video-progress {
@@ -270,6 +273,11 @@
             padding: 20px;
             border-radius: 15px;
             border-left: 5px solid #667eea;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1; /* fill remaining vertical space in right-panel */
+            overflow: hidden;
         }
         
         .selection-info h3 {
@@ -285,17 +293,157 @@
             font-family: monospace;
             font-size: 12px;
             color: #666;
-            margin-bottom: 15px;
-            max-height: 300px;
+            margin-bottom: 0;
+            /* allow coords area to expand and scroll within the selection-info */
+            flex: 1;
+            max-height: none;
+            overflow: auto;
+        }
+        
+        .group-section {
+            margin-bottom: 12px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+            transition: all 0.2s ease;
+        }
+        
+        .group-section.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        }
+        
+        .group-header {
+            padding: 12px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+        
+        .group-header:hover {
+            padding: 12px 12px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .group-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .group-toggle-icon {
+            display: inline-block;
+            transition: transform 0.2s ease;
+            font-size: 14px;
+        }
+        
+        .group-section:not(.expanded) .group-toggle-icon {
+            transform: rotate(-90deg);
+        }
+        
+        .group-count {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        
+        .group-persons {
+            display: none;
+            padding: 0;
+            max-height: 400px;
             overflow-y: auto;
         }
         
-        .box-item {
-            padding: 8px;
+        .group-section.expanded .group-persons {
+            display: block;
+        }
+        
+        .person-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .person-item:last-child {
+            border-bottom: none;
+        }
+        
+        .person-item:hover {
+            background: #f5f5f5;
+            padding-left: 16px;
+        }
+        
+        .person-item.selected {
+            background: rgba(102, 126, 234, 0.15);
+            border-left: 4px solid #667eea;
+            padding-left: 8px;
+            font-weight: 600;
+        }
+        
+        .person-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .person-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .person-coords {
+            font-size: 11px;
+            color: #999;
+            margin-right: 8px;
+        }
+        
+        .person-actions {
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .person-item:hover .person-actions {
+            opacity: 1;
+        }
+        
+        .person-actions button {
+            padding: 3px 6px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .person-actions button:hover {
+            transform: scale(1.05);
+        }
+        
+        .individual-item {
+            padding: 12px;
             margin-bottom: 6px;
             background: white;
             border-radius: 5px;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #999;
             font-size: 12px;
             display: flex;
             justify-content: space-between;
@@ -487,7 +635,7 @@
         <!-- Left Panel -->
         <div class="left-panel">
             <div class="video-progress" id="videoProgress">
-                🎥 Video <span id="currentVideoNum">1</span> of <span id="totalVideoNum">?</span>. Frame: <span id="currentFrameNum">?</span>
+                🎥 Video <span id="currentVideoNum">1</span> of <span id="totalVideoNum">?</span> (<span id="videoFolderName">Loading...</span>) | Frame: <span id="currentFrameNum">?</span>
             </div>
             
             <!-- Annotation Frame Section -->
@@ -531,9 +679,46 @@
                 <h1>FINE-GRAINED ANNOTATION</h1>
                 <p>Persons are detected automatically. Review, refine, and submit.</p>
             </div>
-            
+
             <h2 class="section-title">📝 Annotation Tool</h2>
+
+             <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <button class="control-btn" id="toggleCoarseBtn" style="background: linear-gradient(45deg, #9C27B0, #7B1FA2); color: white; flex: 1; min-width: 120px; font-size: 14px;">
+                    📦 Show Coarse Groups
+                </button>
+                <button class="control-btn" id="toggleShowAllBtn" style="background: linear-gradient(45deg, #2E7D32, #1B5E20); color: white; flex: 1; min-width: 120px; font-size: 14px;">
+                    👁️ Show All
+                </button>
+                <!-- ❌ DELETE THIS: -->
+                <button class="control-btn" id="toggleAddBoxBtn" style="background: linear-gradient(45deg, #0288D1, #0277BD); color: white; flex: 1; min-width: 120px; font-size: 14px;">
+    ➕ Add Box
+                </button>
+            </div>
             
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button class="control-btn" id="submitBtn" style="background: linear-gradient(45deg, #667eea, #764ba2); color: white; flex: 1; font-size: 16px;">
+                    ✅ Submit
+                </button>
+            </div>
+
+           
+            
+            <div class="selection-info">
+                <h3>👥 Annotation Groups (<span id="groupCount">0</span>) / Detections (<span id="boxCount">0</span>)</h3>
+                <div class="selection-coords" id="selectionCoords">
+                    Detecting persons...</div>
+            </div>
+            
+            <div id="loadingSpinner" style="display: none;">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Running detection...
+                </div>
+            </div>
+ 
+            
+            <h2 class="section-title">📝 Instructions </h2>
+
             <div class="instructions-section">
                 <h3>📋 How to Use</h3>
                 <ol>
@@ -561,33 +746,83 @@
                     <li><strong>Submit:</strong> When satisfied, click <strong>Submit</strong>. It saves the current video and moves to the next one automatically. On the last video it saves everything and downloads the full annotation JSON.</li>
                 </ol>
             </div>
+
+
             
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                <button class="control-btn" id="toggleCoarseBtn" style="background: linear-gradient(45deg, #9C27B0, #7B1FA2); color: white; flex: 1; min-width: 120px; font-size: 14px;">
-                    📦 Show Coarse Groups
-                </button>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="control-btn" id="submitBtn" style="background: linear-gradient(45deg, #667eea, #764ba2); color: white; flex: 1; font-size: 16px;">
-                    ✅ Submit
-                </button>
-            </div>
-            
-            <div class="selection-info">
-                <h3>🎯 Detections (<span id="boxCount">0</span>)</h3>
-                <div class="selection-coords" id="selectionCoords">
-                    Detecting persons...</div>
-            </div>
-            
-            <div id="loadingSpinner" style="display: none;">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Running detection...
-                </div>
-            </div>
-        </div>
+       </div>
     </div>
+
+    <!-- Debug Panel -->
+    <div id="debugPanel" style="position: fixed; bottom: 20px; right: 20px; width: 400px; max-height: 300px; background: #1a1a1a; color: #0f0; border: 2px solid #0f0; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 11px; overflow-y: auto; z-index: 9999; display: none;">
+        <div style="margin-bottom: 10px; font-weight: bold; color: #0f0;">Debug Log (Ctrl+D to toggle)</div>
+        <div id="debugLog"></div>
+    </div>
+
+    <script>
+        // Debug panel system
+        window.debugLog = [];
+        window.showDebug = false;
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addDebugLog(msg, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${msg}`;
+            window.debugLog.push(logEntry);
+            if (window.debugLog.length > 200) {
+                window.debugLog.shift();
+            }
+            updateDebugDisplay();
+            originalLog(logEntry);
+        }
+        
+        function updateDebugDisplay() {
+            const logDiv = document.getElementById('debugLog');
+            if (logDiv) {
+                logDiv.innerHTML = window.debugLog.slice(-20).map(log => {
+                    const color = log.includes('ERROR') ? '#ff4444' : log.includes('WARN') ? '#ffaa44' : '#0f0';
+                    return `<div style="color: ${color};">${log}</div>`;
+                }).join('');
+            }
+        }
+        
+        // Toggle debug panel with Ctrl+D
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'd') {
+                window.showDebug = !window.showDebug;
+                document.getElementById('debugPanel').style.display = window.showDebug ? 'block' : 'none';
+            }
+        });
+        
+        // Capture all console messages
+        console.log = function(...args) {
+            addDebugLog(args.join(' '), 'log');
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            addDebugLog(args.join(' '), 'error');
+            originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+            addDebugLog(args.join(' '), 'warn');
+            originalWarn.apply(console, args);
+        };
+        
+        // Capture uncaught errors
+        window.addEventListener('error', (e) => {
+            addDebugLog(`Uncaught Error: ${e.message} at ${e.filename}:${e.lineno}`, 'error');
+        });
+        
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', (e) => {
+            addDebugLog(`Unhandled Promise Rejection: ${e.reason}`, 'error');
+        });
+        
+        addDebugLog('Page loaded. Press Ctrl+D to toggle debug panel.');
+    </script>
 
     <script src="{{ url_for('static', filename='finegrained_app.js') }}"></script>
 </body>
