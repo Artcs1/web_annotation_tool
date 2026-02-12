@@ -213,7 +213,7 @@ class VideoAnnotationApp:
             
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file.split('/',1)[1]#file[7:]
+                folder_name = os.path.basename(file)
                 
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"
@@ -279,7 +279,7 @@ class VideoAnnotationApp:
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
             files.sort()
             
-            folder_name = files[video_index].split('/',1)[1]#[7:]
+            folder_name = os.path.basename(files[video_index])
             
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
             folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
@@ -339,7 +339,7 @@ class VideoAnnotationApp:
             
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file.split('/',1)[1]#file[7:]
+                folder_name = os.path.basename(file)
 
 
                 if os.path.isdir(folder_path):
@@ -372,7 +372,7 @@ class VideoAnnotationApp:
             files = glob.glob(self.VIDEO_VALIDATION_BASE_PATH+'/*')
             files.sort()
             
-            folder_name = files[video_index].split('/',1)[1]#[7:]
+            folder_name = os.path.basename(files[video_index])
             
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
             folder_path = os.path.join(self.VIDEO_VALIDATION_BASE_PATH, folder_name)
@@ -446,7 +446,7 @@ class VideoAnnotationApp:
 
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file.split('/',1)[1]#file[7:]
+                folder_name = os.path.basename(file)
 
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"
@@ -528,7 +528,7 @@ class VideoAnnotationApp:
             files = glob.glob(self.YES_NO_VIDEO_BASE_PATH+'/*')
             files.sort()
 
-            folder_name = files[video_index].split('/',1)[1]
+            folder_name = os.path.basename(files[video_index])
 
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
             folder_path = os.path.join(self.YES_NO_VIDEO_BASE_PATH, folder_name)
@@ -612,7 +612,7 @@ class VideoAnnotationApp:
             
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file.split('/',1)[1]#file[7:]
+                folder_name = os.path.basename(file)
                 
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"
@@ -659,9 +659,11 @@ class VideoAnnotationApp:
                 start_index    = int(rand_number*self.number_of_clips)+left_in[id_r]
                 annotatedFrame = possible_frames[id_r]
 
+            print('VIDEO')
+            print(videos[0]) 
 
-            print(start_index)
-            print(annotatedFrame)
+            #print(start_index)
+            #print(annotatedFrame)
 
             return jsonify({
                 'success': True,
@@ -700,7 +702,7 @@ class VideoAnnotationApp:
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
             files.sort()
 
-            folder_name = files[video_index-1].split('/',1)[1]#[7:]
+            folder_name = os.path.basename(files[video_index])
             print(folder_name)
 
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
@@ -732,7 +734,7 @@ class VideoAnnotationApp:
         
             files = glob.glob(self.VIDEO_BASE_PATH+'/*')
             files.sort()
-            folder_name = files[video_index-1].split('/',1)[1]#[7:]
+            folder_name = os.path.basename(files[video_index])
             video_index = int(folder_name.split("_")[-1])
 
             print(video_index)
@@ -854,7 +856,7 @@ class VideoAnnotationApp:
 
                 files = glob.glob(self.VIDEO_BASE_PATH+'/*')
                 files.sort()
-                folder_name = files[video_index-1].split('/',1)[1]#[7:]
+                folder_name = os.path.basename(files[video_index-1])
                 video_index = int(folder_name.split("_")[-1])
 
                 #print(self.COARSE_ANNOTATIONS['annotations'])
@@ -936,7 +938,7 @@ class VideoAnnotationApp:
 
             for i, file in enumerate(files):
                 folder_path = file
-                folder_name = file.split('/',1)[1]#file[7:]
+                folder_name = os.path.basename(file)
 
                 if os.path.isdir(folder_path):
                     first_frame = f"00001{self.FRAME_EXTENSION}"

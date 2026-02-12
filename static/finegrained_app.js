@@ -978,6 +978,9 @@ class VideoAnnotationTool {
 
         // Minimum size filter
         if (Math.abs(br_x - tl_x) >= 10 && Math.abs(br_y - tl_y) >= 10) {
+            // By default assign new boxes to the currently selected group (if any),
+            // otherwise default to 'individual'. This allows adding to empty coarse groups.
+            const assignLabel = this.selectedGroup || 'individual';
             const newBox = {
                 id: `box_${Date.now()}`,
                 tl_x: Math.round(tl_x),
@@ -985,13 +988,14 @@ class VideoAnnotationTool {
                 br_x: Math.round(br_x),
                 br_y: Math.round(br_y),
                 confidence: null,
-                label: 'individual'
+                label: assignLabel
             };
             this.boxes.push(newBox);
             // Select the newly added box and ensure its group is visible
             const newIdx = this.boxes.length - 1;
             this.selectedBox = newIdx;
             this.selectedGroup = newBox.label;
+            // Ensure the group is expanded/visible after adding
             this.expandedGroups.add(newBox.label);
             this.showAll = false;
             document.getElementById('boxCount').textContent = this.boxes.length;
@@ -1064,16 +1068,31 @@ class VideoAnnotationTool {
         const list = document.getElementById('selectionCoords');
         
         if (this.boxes.length === 0) {
-            list.innerHTML = 'No detections';
-            return;
+            // Even if there are no detected boxes, render the coarse groups (may be empty)
+            // so annotators can add people into empty groups.
+            const groupsFromCoarse = (this.coarseGroups || []).map(g => `group_${g.groupId}`);
+            if (groupsFromCoarse.length === 0) {
+                list.innerHTML = 'No detections';
+                return;
+            }
+            // otherwise continue to render with zero counts
         }
         
-        // Organize boxes by group
+        // Organize boxes by group, but start from coarseGroups so empty groups are shown
         const groups = {};
         const individuals = [];
-        
+
+        // Initialize groups from coarseGroups (ensures empty groups appear)
+        if (Array.isArray(this.coarseGroups)) {
+            this.coarseGroups.forEach(g => {
+                const label = `group_${g.groupId}`;
+                groups[label] = [];
+            });
+        }
+
+        // Populate with actual boxes
         this.boxes.forEach((box, idx) => {
-            if (box.label === 'individual') {
+            if (box.label === 'individual' || !box.label) {
                 individuals.push({ box, idx });
             } else {
                 if (!groups[box.label]) {
@@ -1083,10 +1102,12 @@ class VideoAnnotationTool {
             }
         });
         
-        // Sort group keys numerically
+        // Sort group keys numerically (handles group_# labels)
         const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
-            const numA = parseInt(a.match(/\d+/)[0]);
-            const numB = parseInt(b.match(/\d+/)[0]);
+            const matchA = a.match(/\d+/);
+            const matchB = b.match(/\d+/);
+            const numA = matchA ? parseInt(matchA[0]) : Number.POSITIVE_INFINITY;
+            const numB = matchB ? parseInt(matchB[0]) : Number.POSITIVE_INFINITY;
             return numA - numB;
         });
         
@@ -1229,9 +1250,14 @@ class VideoAnnotationTool {
     
     getAllGroupLabels() {
         const labels = new Set();
+        // include labels from detected boxes
         this.boxes.forEach(b => {
             labels.add(b.label || 'individual');
         });
+        // include coarse groups (even if empty)
+        if (Array.isArray(this.coarseGroups)) {
+            this.coarseGroups.forEach(g => labels.add(`group_${g.groupId}`));
+        }
         return Array.from(labels);
     }
     
@@ -1325,13 +1351,19 @@ class VideoAnnotationTool {
         const box = this.boxes[idx];
         if (!box) return;
         
-        // Get list of all available groups and option to create new group
+        // Get list of all available groups (from existing boxes AND coarseGroups)
         const availableGroups = new Set();
         this.boxes.forEach(b => {
-            if (b.label.startsWith('group_')) {
+            if (b.label && b.label.startsWith('group_')) {
                 availableGroups.add(b.label);
             }
         });
+        // Include coarse groups so empty groups are selectable
+        if (Array.isArray(this.coarseGroups)) {
+            this.coarseGroups.forEach(g => {
+                availableGroups.add(`group_${g.groupId}`);
+            });
+        }
         
         // Create dialog to select new label
         const groupArray = Array.from(availableGroups).sort();
