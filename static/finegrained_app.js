@@ -1142,6 +1142,7 @@ class VideoAnnotationTool {
                             </div>
                             <div class="person-coords">(${Math.round(box.tl_x)}, ${Math.round(box.tl_y)}, ${Math.round(box.br_x)}, ${Math.round(box.br_y)})</div>
                             <div class="person-actions">
+                                ${groupLabel !== 'individual' ? `<button onclick="event.stopPropagation(); tool.makePersonIndividual(${idx})" style="background: #ff9800; color: white; padding: 6px 8px;" title="Make this person individual">👤</button>` : ''}
                                 <button onclick="event.stopPropagation(); tool.editLabel(${idx})" style="background: ${color}; color: white;">Edit</button>
                                 <button onclick="event.stopPropagation(); tool.deleteBox(${idx})" style="background: #ff6b6b; color: white;">×</button>
                             </div>
@@ -1310,6 +1311,28 @@ class VideoAnnotationTool {
             this.renumberGroups();
             this.updateGroupDisplay();
             this.drawBoxes();
+        }
+    }
+    
+    makePersonIndividual(idx) {
+        // Convert a single person to individual
+        if (idx >= 0 && idx < this.boxes.length) {
+            const box = this.boxes[idx];
+            const oldLabel = box.label;
+            
+            if (oldLabel !== 'individual') {
+                box.label = 'individual';
+                console.log(`Converted box ${idx} from ${oldLabel} to individual`);
+                
+                // Clear selection
+                this.selectedBox = null;
+                this.selectedGroup = null;
+                
+                // Renumber groups to fill gaps if needed
+                this.renumberGroups();
+                this.updateGroupDisplay();
+                this.drawBoxes();
+            }
         }
     }
     
