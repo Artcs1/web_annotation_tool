@@ -1128,7 +1128,10 @@ class VideoAnnotationTool {
                         <span class="group-toggle-icon">${isExpanded ? '▼' : '▶'}</span>
                         <span style="color: ${color}; font-weight: bold;">${groupLabel}</span>
                     </div>
-                    <span class="group-count">${groupBoxes.length} person${groupBoxes.length !== 1 ? 's' : ''}</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span class="group-count">${groupBoxes.length} person${groupBoxes.length !== 1 ? 's' : ''}</span>
+                        ${groupBoxes.length > 0 ? `<button onclick="event.stopPropagation(); tool.makeAllIndividual('${groupLabel}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; white-space: nowrap;" title="Convert all persons in this group to individuals">👤 Make All Individual</button>` : ''}
+                    </div>
                 </div>
                 <div class="group-persons" style="display: ${isExpanded ? 'block' : 'none'};">
                     ${groupBoxes.map(({ box, idx }, i) => `
@@ -1286,6 +1289,28 @@ class VideoAnnotationTool {
         }
         this.updateGroupDisplay();
         this.drawBoxes();
+    }
+    
+    makeAllIndividual(groupLabel) {
+        // Convert all boxes in a group to individual
+        let convertedCount = 0;
+        this.boxes.forEach(box => {
+            if (box.label === groupLabel) {
+                box.label = 'individual';
+                convertedCount++;
+            }
+        });
+        
+        if (convertedCount > 0) {
+            console.log(`Converted ${convertedCount} boxes from ${groupLabel} to individual`);
+            // Clear selection
+            this.selectedBox = null;
+            this.selectedGroup = null;
+            // Renumber groups to fill gaps
+            this.renumberGroups();
+            this.updateGroupDisplay();
+            this.drawBoxes();
+        }
     }
     
     getFirstGroupLabel() {
