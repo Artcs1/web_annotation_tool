@@ -45,11 +45,21 @@ class VideoAnnotationApp:
 
         self.BASE_DIR = Path(__file__).parent
         self.VIDEOS_DIR = self.BASE_DIR / "videos"
-        self.ANNOTATIONS_FILE = self.BASE_DIR / "coarse_group" / "all_annotations.json"
+        self.ANNOTATIONS_FILE = self.BASE_DIR / "results" / "all_annotations.json"
+        self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
+        
         self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
+
+        if self.FINEGRAINED_ANNOTATIONS_FILE.exists():
+            with open(self.FINEGRAINED_ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
+                self.FINEGRAINED_ANNOTATIONS = json.load(f)
+            print(f"[INFO] Loaded finegrained annotations: {len(self.FINEGRAINED_ANNOTATIONS.get('annotations', []))} entries")
+        else:
+            self.FINEGRAINED_ANNOTATIONS = {'annotations': []}
+            print("[WARN] Finegrained annotations file not found")
 
         def load_detections_cache():
             if self.DETECTIONS_CACHE_FILE.exists():
@@ -1032,6 +1042,123 @@ class VideoAnnotationApp:
                 traceback.print_exc()
                 return jsonify({'success': False, 'error': str(e)}), 500
 
+        ######################
+        ### VISUALIZER ANN ###       
+        ######################
+        
+        
+        @self.app.route('/visualizer')
+        @self.app.route('/visualizer/<int:clip_id>')
+        @self.app.route('/visualizer/<int:clip_id>/<int:frame_id>')
+        def visualizer(clip_id=1, frame_id=None):
+            """Visualizer for coarse annotations"""
+            # Determine available frames for this clip
+            available_frames = []
+            for ann in self.COARSE_ANNOTATIONS.get('annotations', []):
+                if ann['videoIndex'] == clip_id:
+                    available_frames.append(ann['videoInfo']['annotationFrame'])
+            print(available_frames)
+            available_frames = sorted(set(available_frames)) or [1, 21, 41]
+            if frame_id is None:
+                frame_id = available_frames[0]
+            total_clips = max(
+                ann['videoIndex']
+                for ann in self.COARSE_ANNOTATIONS.get('annotations', [])
+            )
+            return render_template(
+                'visualizer.html',
+                clip_id=clip_id,
+                frame_id=frame_id,
+                total_clips=total_clips,
+                available_frames=available_frames,
+            )
+
+        @self.app.route('/api/visualizer/annotations/<int:clip_id>')
+        def visualizer_annotations(clip_id):
+            """Return all coarse annotations for a clip (all annotated frames)"""
+            results = {}
+            for ann in self.COARSE_ANNOTATIONS.get('annotations', []):
+                if ann['videoIndex'] == clip_id:
+                    frame = ann['videoInfo']['annotationFrame']
+                    results[str(frame)] = {
+                        'groups': ann.get('groups', []),
+                        'numberOfGroups': ann.get('numberOfGroups', 0),
+                        'videoInfo': ann.get('videoInfo', {}),
+                    }
+            return jsonify({'success': True, 'clip_id': clip_id, 'frames': results})
+
+        @self.app.route('/api/visualizer/frame/<int:clip_id>/<int:frame_id>')
+        def visualizer_frame(clip_id, frame_id):
+            """Serve a specific frame image for the visualizer"""
+            frame_id+=1
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            frame_full = os.path.join(folder_path, frame_name)
+            if not os.path.exists(frame_full):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+        
+        ##################################
+        ### FINEGRAINED VISUALIZER ANN ###       
+        ##################################
+        
+        @self.app.route('/finegrained_visualizer')
+        @self.app.route('/finegrained_visualizer/<int:clip_id>')
+        @self.app.route('/finegrained_visualizer/<int:clip_id>/<int:frame_id>')
+        def finegrained_visualizer(clip_id=1, frame_id=None):
+            """Visualizer for finegrained annotations"""
+            available_frames = []
+            for ann in self.FINEGRAINED_ANNOTATIONS.get('annotations', []):
+                if ann['videoIndex'] == clip_id:
+                    available_frames.append(ann['videoInfo']['annotationFrame'])
+            available_frames = sorted(set(available_frames)) or [1, 21, 41]
+            if frame_id is None:
+                frame_id = available_frames[0]
+            all_indices = [
+                ann['videoIndex']
+                for ann in self.FINEGRAINED_ANNOTATIONS.get('annotations', [])
+            ]
+            total_clips = max(all_indices) if all_indices else 1
+            return render_template(
+                'finegrained_visualizer.html',
+                clip_id=clip_id,
+                frame_id=frame_id,
+                total_clips=total_clips,
+                available_frames=available_frames,
+            )
+
+        @self.app.route('/api/finegrained_visualizer/annotations/<int:clip_id>')
+        def finegrained_visualizer_annotations(clip_id):
+            """Return all finegrained annotations for a clip"""
+            results = {}
+            for ann in self.FINEGRAINED_ANNOTATIONS.get('annotations', []):
+                if ann['videoIndex'] == clip_id:
+                    frame = ann['videoInfo']['annotationFrame']
+                    results[str(frame)] = {
+                        'groups': ann.get('groups', []),
+                        'numberOfGroups': ann.get('numberOfGroups', 0),
+                        'videoInfo': ann.get('videoInfo', {}),
+                    }
+            return jsonify({'success': True, 'clip_id': clip_id, 'frames': results})
+
+        @self.app.route('/api/finegrained_visualizer/frame/<int:clip_id>/<int:frame_id>')
+        def finegrained_visualizer_frame(clip_id, frame_id):
+            """Serve a specific frame image for the finegrained visualizer"""
+            frame_id+=1
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            frame_full = os.path.join(folder_path, frame_name)
+            if not os.path.exists(frame_full):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+
+        
         ####################
         ### MISCELANIOUS ###       
         ####################

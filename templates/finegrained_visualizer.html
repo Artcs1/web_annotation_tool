@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finegrained Visualizer — Clip {{ clip_id }}, Frame {{ frame_id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .left-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-panel {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .header-bar {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 20px;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .frame-section {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-label {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .frame-canvas-wrapper {
+            position: relative;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .frame-canvas-wrapper img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        canvas#bboxCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: white;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .btn-prev { background: linear-gradient(45deg, #ff9800, #f57c00); }
+        .btn-next { background: linear-gradient(45deg, #4CAF50, #45a049); }
+        .btn-frame { background: linear-gradient(45deg, #667eea, #764ba2); }
+        .btn-frame.active {
+            box-shadow: 0 0 0 3px #fff, 0 0 0 6px #667eea;
+        }
+
+        .nav-separator {
+            width: 2px;
+            height: 30px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 2px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .panel h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .clip-picker {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .clip-picker label {
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .clip-picker input[type="number"] {
+            width: 90px;
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .clip-picker input[type="number"]:focus {
+            border-color: #667eea;
+        }
+
+        .clip-picker .go-btn {
+            padding: 8px 18px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .clip-picker .go-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .group-list {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .group-item {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid;
+            font-size: 13px;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .group-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+
+        .group-item.highlighted {
+            box-shadow: 0 0 0 2px #667eea, 0 3px 12px rgba(102,126,234,0.3);
+            background: #f0f2ff;
+        }
+
+        .group-item .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+        }
+
+        .group-item .group-coords {
+            font-family: monospace;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .label-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .no-groups {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .shortcuts {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .shortcuts h4 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .shortcut-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+
+        .shortcut-key {
+            background: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            z-index: 20;
+            border-radius: 15px;
+        }
+
+        .loading-overlay.hidden { display: none; }
+
+        @media (max-width: 1100px) {
+            .container { flex-direction: column; }
+            .right-panel { flex: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- LEFT PANEL -->
+        <div class="left-panel">
+            <div class="header-bar" id="headerBar">
+                🔬 Finegrained Visualizer — Clip <span id="headerClip">{{ clip_id }}</span> / Frame <span id="headerFrame">{{ frame_id }}</span>
+            </div>
+
+            <div class="frame-section">
+                <div class="section-label" id="sectionLabel">
+                    Clip <span id="labelClip">{{ clip_id }}</span> — Frame <span id="labelFrame">{{ frame_id }}</span>
+                    (<span id="groupCount">0</span> detection<span id="groupPlural">s</span>)
+                </div>
+                <div class="frame-canvas-wrapper" id="canvasWrapper">
+                    <img id="frameImg" src="" alt="frame" crossorigin="anonymous">
+                    <canvas id="bboxCanvas"></canvas>
+                    <div class="loading-overlay" id="loadingOverlay">Loading…</div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="nav-controls">
+                <button class="nav-btn btn-prev" id="prevClipBtn" title="Previous clip">⏮ Prev Clip</button>
+                <button class="nav-btn btn-next" id="nextClipBtn" title="Next clip">Next Clip ⏭</button>
+
+                <div class="nav-separator"></div>
+
+                <span style="font-weight:600;color:#555;font-size:14px;">Frames:</span>
+                {% for f in available_frames %}
+                <button class="nav-btn btn-frame {% if f == frame_id %}active{% endif %}"
+                        data-frame="{{ f }}" title="Go to frame {{ f }}">{{ f }}</button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="right-panel">
+            <!-- Clip picker -->
+            <div class="panel">
+                <h3>📂 Jump to Clip</h3>
+                <div class="clip-picker">
+                    <label for="clipInput">Clip</label>
+                    <input type="number" id="clipInput" min="1" max="{{ total_clips }}" value="{{ clip_id }}">
+                    <span style="color:#999;font-size:13px;">/ {{ total_clips }}</span>
+                    <button class="go-btn" id="goClipBtn">Go</button>
+                </div>
+            </div>
+
+            <!-- Legend + Groups panel -->
+            <div class="panel">
+                <h3>🏷️ Detections on this Frame</h3>
+                <div id="legendContainer"></div>
+                <div class="group-list" id="groupList">
+                    <div class="no-groups">Loading…</div>
+                </div>
+            </div>
+
+            <!-- Keyboard shortcuts -->
+            <div class="panel shortcuts">
+                <h4>⌨️ Keyboard Shortcuts</h4>
+                <div class="shortcut-row"><span>Previous clip</span> <span class="shortcut-key">A</span></div>
+                <div class="shortcut-row"><span>Next clip</span> <span class="shortcut-key">D</span></div>
+                <div class="shortcut-row"><span>Frame 1</span> <span class="shortcut-key">1</span></div>
+                <div class="shortcut-row"><span>Frame 21</span> <span class="shortcut-key">2</span></div>
+                <div class="shortcut-row"><span>Frame 41</span> <span class="shortcut-key">3</span></div>
+                <div class="shortcut-row"><span>Jump to clip</span> <span class="shortcut-key">Enter</span></div>
+                <div class="shortcut-row"><span>Deselect highlight</span> <span class="shortcut-key">Esc</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---- State ----
+        const TOTAL_CLIPS = {{ total_clips }};
+        const AVAILABLE_FRAMES = {{ available_frames | tojson }};
+        let currentClip = {{ clip_id }};
+        let currentFrame = {{ frame_id }};
+        let annotationCache = {};
+        let currentGroups = [];
+        let currentImgW = 1920;
+        let currentImgH = 1080;
+        let highlightIndex = -1;
+
+        // ---- DOM refs ----
+        const frameImg       = document.getElementById('frameImg');
+        const bboxCanvas     = document.getElementById('bboxCanvas');
+        const ctx            = bboxCanvas.getContext('2d');
+        const canvasWrapper  = document.getElementById('canvasWrapper');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const headerClip     = document.getElementById('headerClip');
+        const headerFrame    = document.getElementById('headerFrame');
+        const labelClip      = document.getElementById('labelClip');
+        const labelFrame     = document.getElementById('labelFrame');
+        const groupCount     = document.getElementById('groupCount');
+        const groupPlural    = document.getElementById('groupPlural');
+        const groupList      = document.getElementById('groupList');
+        const legendContainer = document.getElementById('legendContainer');
+        const clipInput      = document.getElementById('clipInput');
+        const prevClipBtn    = document.getElementById('prevClipBtn');
+        const nextClipBtn    = document.getElementById('nextClipBtn');
+
+        // ---- Stable color palette for labels ----
+        // 25+ distinct, high-contrast colors so each group_N / individual gets a unique color
+        const LABEL_PALETTE = [
+            '#E74C3C', '#2ECC71', '#3498DB', '#F1C40F', '#9B59B6',
+            '#E67E22', '#1ABC9C', '#E84393', '#00B894', '#6C5CE7',
+            '#FD79A8', '#00CEC9', '#D63031', '#74B9FF', '#A29BFE',
+            '#55EFC4', '#FDCB6E', '#636E72', '#B2BEC3', '#0984E3',
+            '#D35400', '#2D3436', '#C0392B', '#16A085', '#8E44AD',
+            '#F39C12',
+        ];
+        const INDIVIDUAL_COLOR = '#95A5A6'; // grey for "individual"
+
+        // Map label string -> stable color
+        const labelColorMap = {};
+        let nextPaletteIdx = 0;
+
+        function labelColor(label) {
+            if (!label) return INDIVIDUAL_COLOR;
+            if (label === 'individual') return INDIVIDUAL_COLOR;
+            if (labelColorMap[label]) return labelColorMap[label];
+            // Assign next palette color
+            labelColorMap[label] = LABEL_PALETTE[nextPaletteIdx % LABEL_PALETTE.length];
+            nextPaletteIdx++;
+            return labelColorMap[label];
+        }
+
+        // Reset color map for consistent assignment per frame
+        function resetLabelColors() {
+            for (const key in labelColorMap) delete labelColorMap[key];
+            nextPaletteIdx = 0;
+        }
+
+        // ---- Fetch annotations ----
+        async function fetchAnnotations(clipId) {
+            if (annotationCache[clipId]) return annotationCache[clipId];
+            const resp = await fetch(`/api/finegrained_visualizer/annotations/${clipId}`);
+            const data = await resp.json();
+            annotationCache[clipId] = data.success ? data.frames : {};
+            return annotationCache[clipId];
+        }
+
+        // ---- Draw bboxes ----
+        function drawBoxes(groups, imgWidth, imgHeight, hlIdx) {
+            if (hlIdx === undefined) hlIdx = highlightIndex;
+            const dispW = frameImg.clientWidth;
+            const dispH = frameImg.clientHeight;
+            bboxCanvas.width = dispW;
+            bboxCanvas.height = dispH;
+            bboxCanvas.style.width = dispW + 'px';
+            bboxCanvas.style.height = dispH + 'px';
+
+            const wrapperRect = canvasWrapper.getBoundingClientRect();
+            const imgRect = frameImg.getBoundingClientRect();
+            bboxCanvas.style.left = (imgRect.left - wrapperRect.left) + 'px';
+            bboxCanvas.style.top = (imgRect.top - wrapperRect.top) + 'px';
+
+            ctx.clearRect(0, 0, dispW, dispH);
+
+            const scaleX = dispW / imgWidth;
+            const scaleY = dispH / imgHeight;
+            const hasHighlight = hlIdx >= 0;
+            const hlLabel = hasHighlight ? (groups[hlIdx].label || 'unknown') : null;
+
+            groups.forEach((g, i) => {
+                const [x1, y1, x2, y2] = g.bbox;
+                const sx = x1 * scaleX;
+                const sy = y1 * scaleY;
+                const sw = (x2 - x1) * scaleX;
+                const sh = (y2 - y1) * scaleY;
+                const color = labelColor(g.label);
+                const lbl = g.label || 'unknown';
+
+                // 3-level: selected=full, same group=medium, rest=dim
+                let alpha, fillAlpha, lineW;
+                if (!hasHighlight) {
+                    alpha = 1; fillAlpha = '30'; lineW = 2.5;
+                } else if (i === hlIdx) {
+                    alpha = 1; fillAlpha = '50'; lineW = 4;
+                } else if (lbl === hlLabel) {
+                    alpha = 0.70; fillAlpha = '25'; lineW = 2.5;
+                } else {
+                    alpha = 0.30; fillAlpha = '10'; lineW = 1.5;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // fill
+                ctx.fillStyle = color + fillAlpha;
+                ctx.fillRect(sx, sy, sw, sh);
+
+                // stroke
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineW;
+                ctx.strokeRect(sx, sy, sw, sh);
+
+                // label tag
+                const tag = g.label || 'unknown';
+                ctx.font = 'bold 13px Segoe UI, sans-serif';
+                const tm = ctx.measureText(tag);
+                const lh = 20;
+                const lx = sx;
+                const ly = sy - lh - 2 > 0 ? sy - lh - 2 : sy + 2;
+                ctx.fillStyle = color;
+                ctx.fillRect(lx, ly, tm.width + 10, lh);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(tag, lx + 5, ly + 15);
+
+                ctx.restore();
+            });
+        }
+
+        function updateSidebarHighlight() {
+            groupList.querySelectorAll('.group-item').forEach(el => {
+                const idx = parseInt(el.dataset.idx);
+                el.classList.toggle('highlighted', idx === highlightIndex && highlightIndex >= 0);
+            });
+        }
+
+        function setHighlight(newIndex, toggle) {
+            if (toggle === undefined) toggle = true;
+            if (newIndex < 0) {
+                highlightIndex = -1;
+            } else if (toggle && highlightIndex === newIndex) {
+                highlightIndex = -1;
+            } else {
+                highlightIndex = newIndex;
+            }
+            updateSidebarHighlight();
+            drawBoxes(currentGroups, currentImgW, currentImgH);
+        }
+
+        function hitTestBBox(clientX, clientY) {
+            if (!currentGroups || currentGroups.length === 0) return -1;
+            const rect = bboxCanvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // Top-most match wins; iterate reverse draw order.
+            for (let i = currentGroups.length - 1; i >= 0; i--) {
+                const g = currentGroups[i];
+                const [x1, y1, x2, y2] = g.bbox;
+                const sx = x1 * (bboxCanvas.width / currentImgW);
+                const sy = y1 * (bboxCanvas.height / currentImgH);
+                const sw = (x2 - x1) * (bboxCanvas.width / currentImgW);
+                const sh = (y2 - y1) * (bboxCanvas.height / currentImgH);
+                if (x >= sx && x <= sx + sw && y >= sy && y <= sy + sh) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        // ---- Render legend ----
+        function renderLegend(groups) {
+            const seen = new Map();
+            groups.forEach(g => {
+                const lbl = g.label || 'unknown';
+                if (!seen.has(lbl)) seen.set(lbl, labelColor(lbl));
+            });
+            if (seen.size === 0) {
+                legendContainer.innerHTML = '';
+                return;
+            }
+            legendContainer.innerHTML = '<div class="legend">' +
+                [...seen.entries()].map(([lbl, c]) =>
+                    `<div class="legend-item"><div class="legend-swatch" style="background:${c}"></div>${lbl}</div>`
+                ).join('') + '</div>';
+        }
+
+        // ---- Sidebar list ----
+        function renderGroupList(groups) {
+            if (!groups || groups.length === 0) {
+                groupList.innerHTML = '<div class="no-groups">No detections for this frame.</div>';
+                return;
+            }
+            // Build entries with original index, then sort by label
+            const entries = groups.map((g, i) => ({ g, i }));
+            entries.sort((a, b) => (a.g.label || 'zzz').localeCompare(b.g.label || 'zzz'));
+
+            groupList.innerHTML = entries.map(({ g, i }) => {
+                const c = labelColor(g.label);
+                const [x1, y1, x2, y2] = g.bbox;
+                const lbl = g.label || 'unknown';
+                return `
+                    <div class="group-item" data-idx="${i}" style="border-left-color:${c}">
+                        <div class="group-header">
+                            <span style="color:${c}">${lbl}</span>
+                        </div>
+                        <div class="group-coords">[${x1}, ${y1}, ${x2}, ${y2}]</div>
+                    </div>`;
+            }).join('');
+
+            // Attach click handlers for highlight
+            groupList.querySelectorAll('.group-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.idx);
+                    setHighlight(idx, true);
+                });
+            });
+        }
+
+        // ---- Load view ----
+        async function loadView(clipId, frameId) {
+            loadingOverlay.classList.remove('hidden');
+
+            currentClip = clipId;
+            currentFrame = frameId;
+
+            headerClip.textContent = clipId;
+            headerFrame.textContent = frameId;
+            labelClip.textContent = clipId;
+            labelFrame.textContent = frameId;
+            clipInput.value = clipId;
+
+            document.querySelectorAll('.btn-frame').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.frame) === frameId);
+            });
+
+            const newUrl = `/finegrained_visualizer/${clipId}/${frameId}`;
+            window.history.pushState({clipId, frameId}, '', newUrl);
+            document.title = `Finegrained Visualizer — Clip ${clipId}, Frame ${frameId}`;
+
+            const frames = await fetchAnnotations(clipId);
+            const annData = frames[String(frameId)] || null;
+            const groups = annData ? annData.groups : [];
+            const imgW = annData ? (annData.videoInfo.normalizedWidth || 1920) : 1920;
+            const imgH = annData ? (annData.videoInfo.normalizedHeight || 1080) : 1080;
+
+            groupCount.textContent = groups.length;
+            groupPlural.textContent = groups.length === 1 ? '' : 's';
+
+            // Store for highlight redraws
+            currentGroups = groups;
+            currentImgW = imgW;
+            currentImgH = imgH;
+            highlightIndex = -1;
+
+            // Reset & assign colors for this frame's labels in order
+            resetLabelColors();
+            // Pre-assign colors in sorted label order for stability
+            const uniqueLabels = [...new Set(groups.map(g => g.label || 'unknown'))].sort();
+            uniqueLabels.forEach(l => labelColor(l));
+
+            renderLegend(groups);
+            renderGroupList(groups);
+
+            const imgUrl = `/api/finegrained_visualizer/frame/${clipId}/${frameId}`;
+            frameImg.onload = () => {
+                drawBoxes(groups, imgW, imgH);
+                loadingOverlay.classList.add('hidden');
+            };
+            frameImg.onerror = () => {
+                ctx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
+                loadingOverlay.textContent = 'Frame not found';
+            };
+            frameImg.src = imgUrl;
+
+            prevClipBtn.disabled = clipId <= 1;
+            nextClipBtn.disabled = clipId >= TOTAL_CLIPS;
+        }
+
+        // ---- Resize handler ----
+        window.addEventListener('resize', () => {
+            fetchAnnotations(currentClip).then(frames => {
+                const annData = frames[String(currentFrame)] || null;
+                const groups = annData ? annData.groups : [];
+                const imgW = annData ? (annData.videoInfo.normalizedWidth || 1920) : 1920;
+                const imgH = annData ? (annData.videoInfo.normalizedHeight || 1080) : 1080;
+                drawBoxes(groups, imgW, imgH);
+            });
+        });
+
+        // ---- Events ----
+        prevClipBtn.addEventListener('click', () => {
+            if (currentClip > 1) loadView(currentClip - 1, currentFrame);
+        });
+        nextClipBtn.addEventListener('click', () => {
+            if (currentClip < TOTAL_CLIPS) loadView(currentClip + 1, currentFrame);
+        });
+
+        document.querySelectorAll('.btn-frame').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loadView(currentClip, parseInt(btn.dataset.frame));
+            });
+        });
+
+        document.getElementById('goClipBtn').addEventListener('click', () => {
+            const val = parseInt(clipInput.value);
+            if (val >= 1 && val <= TOTAL_CLIPS) loadView(val, currentFrame);
+        });
+        bboxCanvas.addEventListener('click', (e) => {
+            const idx = hitTestBBox(e.clientX, e.clientY);
+            if (idx >= 0) {
+                setHighlight(idx, true);
+            } else {
+                setHighlight(-1, false);
+            }
+        });
+        clipInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(clipInput.value);
+                if (val >= 1 && val <= TOTAL_CLIPS) loadView(val, currentFrame);
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            switch (e.key) {
+                case 'a': case 'A':
+                    if (currentClip > 1) loadView(currentClip - 1, currentFrame);
+                    break;
+                case 'd': case 'D':
+                    if (currentClip < TOTAL_CLIPS) loadView(currentClip + 1, currentFrame);
+                    break;
+                case '1':
+                    if (AVAILABLE_FRAMES.includes(1)) loadView(currentClip, 1);
+                    break;
+                case '2':
+                    if (AVAILABLE_FRAMES.includes(21)) loadView(currentClip, 21);
+                    break;
+                case '3':
+                    if (AVAILABLE_FRAMES.includes(41)) loadView(currentClip, 41);
+                    break;
+                case 'Escape':
+                    setHighlight(-1, false);
+                    break;
+            }
+        });
+
+        window.addEventListener('popstate', (e) => {
+            if (e.state) loadView(e.state.clipId, e.state.frameId);
+        });
+
+        // ---- Initial load ----
+        loadView(currentClip, currentFrame);
+    </script>
+</body>
+</html>
