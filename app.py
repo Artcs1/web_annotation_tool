@@ -595,6 +595,7 @@ class VideoAnnotationApp:
             except:
                 ann_results = []
 
+            print(ann_results)
             annotated_clips = [(result['globalIndex']-1, result['videoInfo']['annotationFrame']) for result in ann_results]
             annotated_block = [(ann[0]//self.number_of_clips, ann[1]) for ann in annotated_clips]
 
@@ -631,7 +632,6 @@ class VideoAnnotationApp:
             if len(ann_incompleted) == 0:
                 possible_choices = [(block, f) for block in np.arange(num_blocks) for f in self.choices_annotatedframe]
                 possible_choices = [block for block in possible_choices if block[0] <12 or block[0] >=24] # TEMPORAL UNTIL PRANAV FINISH
-
 
                 global_counts = [self.finegrained_annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips), "videoInfo.annotationFrame": f}) for p, f in possible_choices]
                 possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]  
