@@ -1,0 +1,823 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking Visualizer — Clip {{ clip_id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            max-width: 1700px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .left-panel {
+            flex: 4;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-width: 0;
+        }
+
+        .right-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .header-bar {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 20px;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .dual-panels {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .video-panel {
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-label {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 18px;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+        }
+        .section-label.original {
+            background: linear-gradient(45deg, #4a4a6a, #2c2c4a);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            background: #1a1a1a;
+            line-height: 0;
+        }
+        .canvas-wrapper img {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+        .canvas-wrapper canvas {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+
+        .playback-bar {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            padding: 16px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .playback-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .play-btn {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+            transition: transform 0.1s, opacity 0.15s;
+        }
+        .play-btn:hover { transform: scale(1.08); }
+
+        .speed-select {
+            padding: 7px 10px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            background: white;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .speed-select:focus { border-color: #667eea; }
+
+        .speed-label { font-size: 13px; color: #666; }
+
+        .step-btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            background: rgba(102, 126, 234, 0.15);
+            color: #667eea;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .step-btn:hover { background: rgba(102, 126, 234, 0.25); transform: translateY(-1px); }
+
+        .frame-counter {
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+            margin-left: auto;
+            white-space: nowrap;
+        }
+
+        .scrubber-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .scrubber-row input[type="range"] {
+            flex: 1;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e0e0e0;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+        .scrubber-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+        }
+        .scrubber-label { color: #999; font-size: 11px; white-space: nowrap; }
+
+        .nav-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: white;
+        }
+        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .nav-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-prev { background: linear-gradient(45deg, #ff9800, #f57c00); }
+        .btn-next { background: linear-gradient(45deg, #4CAF50, #45a049); }
+
+        .nav-separator { width: 2px; height: 30px; background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+        .clip-picker {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .clip-picker label { font-weight: 600; color: #555; font-size: 14px; }
+        .clip-picker input[type="number"] {
+            width: 80px;
+            padding: 8px 10px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .clip-picker input[type="number"]:focus { border-color: #667eea; }
+        .clip-picker .go-btn {
+            padding: 8px 18px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .clip-picker .go-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .clip-total { font-size: 13px; color: #888; }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 18px;
+            border-radius: 15px;
+        }
+        .panel h3 { color: #333; margin-bottom: 12px; font-size: 15px; }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-key   { color: #777; }
+        .stat-value { font-weight: 700; color: #333; }
+
+        .track-list {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .track-item {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid;
+            font-size: 13px;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .track-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        .track-item.highlighted {
+            box-shadow: 0 0 0 2px #667eea, 0 3px 12px rgba(102,126,234,0.3);
+            background: #f0f2ff;
+        }
+        .track-item .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+        }
+        .track-item .item-coords {
+            font-family: monospace;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .track-list::-webkit-scrollbar { width: 4px; }
+        .track-list::-webkit-scrollbar-track { background: transparent; }
+        .track-list::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.3); border-radius: 2px; }
+
+        .shortcuts { font-size: 12px; color: #666; line-height: 1.6; }
+        .shortcuts h4 { color: #333; margin-bottom: 8px; font-size: 14px; }
+        .shortcut-row { display: flex; justify-content: space-between; margin: 4px 0; }
+        .shortcut-key {
+            background: #f0f0f0; padding: 2px 8px; border-radius: 4px;
+            font-family: monospace; font-weight: 600; color: #667eea; font-size: 12px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            z-index: 20;
+        }
+        .loading-overlay.hidden { display: none; }
+
+        #globalLoading {
+            position: fixed;
+            inset: 0;
+            background: rgba(100, 95, 180, 0.55);
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            color: white;
+            gap: 16px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .spinner {
+            width: 44px; height: 44px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #globalLoading.hidden { display: none; }
+
+        @media (max-width: 1100px) {
+            .container { flex-direction: column; }
+            .dual-panels { grid-template-columns: 1fr; }
+            .right-panel { flex: none; }
+        }
+    </style>
+</head>
+<body>
+<div id="globalLoading">
+    <div class="spinner"></div>
+    <span>Loading tracking data&#8230;</span>
+</div>
+
+<div class="container">
+    <div class="left-panel">
+        <div class="header-bar" id="headerBar">
+            &#127919; Tracking Visualizer &#8212; Clip <span id="headerClip">{{ clip_id }}</span>&nbsp;/&nbsp;{{ total_clips }}
+        </div>
+
+        <div class="dual-panels">
+            <div class="video-panel">
+                <div class="section-label">With Annotations</div>
+                <div class="canvas-wrapper" id="annotatedWrapper">
+                    <img id="annotatedImg" src="" alt="Annotated frame" draggable="false">
+                    <canvas id="bboxCanvas"></canvas>
+                    <div class="loading-overlay hidden" id="frameLoading">Loading&#8230;</div>
+                </div>
+            </div>
+            <div class="video-panel">
+                <div class="section-label original">Original (No Annotations)</div>
+                <div class="canvas-wrapper" id="originalWrapper">
+                    <img id="originalImg" src="" alt="Original frame" draggable="false">
+                </div>
+            </div>
+        </div>
+
+        <div class="playback-bar">
+            <div class="playback-top">
+                <button class="play-btn" id="playBtn" title="Play / Pause (Space)">&#9654;</button>
+                <select class="speed-select" id="speedSelect">
+                    <option value="5">0.5&#215;</option>
+                    <option value="10" selected>1&#215;</option>
+                    <option value="20">2&#215;</option>
+                </select>
+                <span class="speed-label">Speed</span>
+                <button class="step-btn" id="prevFrameBtn" title="Previous frame">&#9664; Frame</button>
+                <button class="step-btn" id="nextFrameBtn" title="Next frame">Frame &#9654;</button>
+                <span class="frame-counter" id="frameCounter">Frame 1 / 50</span>
+            </div>
+            <div class="scrubber-row">
+                <span class="scrubber-label">1</span>
+                <input type="range" id="scrubber" min="0" max="49" value="0" step="1">
+                <span class="scrubber-label" id="scrubberMax">50</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="right-panel">
+        <div class="panel">
+            <h3>&#128194; Navigate Clips</h3>
+            <div style="display:flex;gap:10px;margin-bottom:12px;">
+                <button class="nav-btn btn-prev" id="prevClipBtn" style="flex:1;justify-content:center;">&#9664; Prev</button>
+                <button class="nav-btn btn-next" id="nextClipBtn" style="flex:1;justify-content:center;">Next &#9654;</button>
+            </div>
+            <div class="clip-picker">
+                <label for="clipInput">Clip</label>
+                <input type="number" id="clipInput" min="1" max="{{ total_clips }}" value="{{ clip_id }}">
+                <span class="clip-total">/ {{ total_clips }}</span>
+                <button class="go-btn" id="goClipBtn">Go</button>
+            </div>
+        </div>
+        <div class="panel">
+            <h3>&#128202; Stats</h3>
+            <div class="stat-row"><span class="stat-key">Clip</span><span class="stat-value" id="statClip">{{ clip_id }}</span></div>
+            <div class="stat-row"><span class="stat-key">Frame</span><span class="stat-value" id="statFrame">1</span></div>
+            <div class="stat-row"><span class="stat-key">Tracks (this frame)</span><span class="stat-value" id="statTracks">&#8212;</span></div>
+            <div class="stat-row"><span class="stat-key">Unique IDs (clip)</span><span class="stat-value" id="statUnique">&#8212;</span></div>
+            <div class="stat-row"><span class="stat-key">Total frames</span><span class="stat-value" id="statTotal">&#8212;</span></div>
+        </div>
+
+        <div class="panel">
+            <h3>&#127991; Tracks in Frame</h3>
+            <div class="track-list" id="trackList">
+                <div style="color:#999;font-style:italic;font-size:13px;padding:8px 0;">Loading&#8230;</div>
+            </div>
+        </div>
+
+        <div class="panel shortcuts">
+            <h4>&#9000;&#65039; Keyboard Shortcuts</h4>
+            <div class="shortcut-row"><span>Play / Pause</span><span class="shortcut-key">Space</span></div>
+            <div class="shortcut-row"><span>Prev frame</span><span class="shortcut-key">&#8592; / A</span></div>
+            <div class="shortcut-row"><span>Next frame</span><span class="shortcut-key">&#8594; / D</span></div>
+            <div class="shortcut-row"><span>Prev clip</span><span class="shortcut-key">Q</span></div>
+            <div class="shortcut-row"><span>Next clip</span><span class="shortcut-key">E</span></div>
+            <div class="shortcut-row"><span>Jump to clip</span><span class="shortcut-key">Enter</span></div>
+            <div class="shortcut-row"><span>Deselect track</span><span class="shortcut-key">Esc</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CLIP_ID     = {{ clip_id }};
+const TOTAL_CLIPS = {{ total_clips }};
+const BASE_URL    = '/api/tracking_visualizer';
+
+// Golden-angle color generator: maximises perceptual distance between any N groups.
+// 137.508° = 360° × (1 - 1/φ), the golden angle — each consecutive index gets a
+// maximally separated hue. Lightness and saturation cycle every 3 / 5 steps to
+// give extra distinctiveness when hues inevitably wrap around for large N.
+function generateColor(index) {
+    const hue = (index * 137.508) % 360;
+    const L = [50, 36, 67][index % 3];
+    const S = [88, 72, 80][Math.floor(index / 3) % 3];
+    return `hsl(${hue.toFixed(1)}, ${S}%, ${L}%)`;
+}
+
+let currentClipId  = CLIP_ID;
+let framesData     = {};
+let numFrames      = 0;
+let currentFrame   = 0;
+let isPlaying      = false;
+let animHandle     = null;
+let lastStepTime   = 0;
+let fps            = 24;
+let trackColors    = {};
+let highlightTrack = -1;
+let imgNaturalW    = 1920;
+let imgNaturalH    = 1080;
+let navigating     = false;
+
+const annotatedImg  = document.getElementById('annotatedImg');
+const originalImg   = document.getElementById('originalImg');
+const canvas        = document.getElementById('bboxCanvas');
+const ctx           = canvas.getContext('2d');
+const playBtn       = document.getElementById('playBtn');
+const scrubber      = document.getElementById('scrubber');
+const frameCounter  = document.getElementById('frameCounter');
+const trackList     = document.getElementById('trackList');
+const speedSelect   = document.getElementById('speedSelect');
+const globalLoading = document.getElementById('globalLoading');
+const frameLoading  = document.getElementById('frameLoading');
+const clipInput     = document.getElementById('clipInput');
+
+// groupColors: group_id -> color  (same group_id = same color across all frames)
+let groupColors = {};
+
+function assignColors(data) {
+    trackColors = {};  // kept for backward compat (track_id -> color via group)
+    groupColors = {};
+    const allGroupIds = new Set();
+    Object.values(data).forEach(dets => dets.forEach(d => allGroupIds.add(d.group_id)));
+    [...allGroupIds].sort((a, b) => a - b).forEach((gid, i) => {
+        groupColors[gid] = generateColor(i);
+    });
+}
+
+async function loadClip(clipId) {
+    const wasPlaying = isPlaying;
+    stopAnimation();
+    globalLoading.classList.remove('hidden');
+    highlightTrack = -1;
+    // Clear preload cache for old clip
+    for (const k of Object.keys(preloadCache)) delete preloadCache[k];
+
+    try {
+        const resp = await fetch(`${BASE_URL}/annotations/${clipId}`);
+        const json = await resp.json();
+        framesData = json.frames || {};
+        numFrames  = Object.keys(framesData).length;
+
+        assignColors(framesData);
+
+        document.getElementById('statClip').textContent   = clipId;
+        document.getElementById('statTotal').textContent  = numFrames;
+        document.getElementById('statUnique').textContent = Object.keys(groupColors).length;
+        document.getElementById('headerClip').textContent = clipId;
+
+        scrubber.max = Math.max(0, numFrames - 1);
+        document.getElementById('scrubberMax').textContent = numFrames;
+
+        await navigateTo(0);
+
+        if (wasPlaying) startAnimation();
+    } finally {
+        globalLoading.classList.add('hidden');
+    }
+}
+
+// Off-screen image cache to avoid flicker during playback
+const preloadCache = {};  // url -> HTMLImageElement (complete)
+
+function preloadFrame(clipId, frameIdx) {
+    const frameNum = frameIdx + 1;
+    const url = `${BASE_URL}/frame/${clipId}/${frameNum}`;
+    const absUrl = new URL(url, window.location.origin).href;
+    if (preloadCache[absUrl]) return;
+    const img = new Image();
+    img.src = url;
+    preloadCache[absUrl] = img;
+}
+
+async function navigateTo(frameIdx, showOverlay = true) {
+    if (navigating) return;
+    navigating = true;
+    if (showOverlay) frameLoading.classList.remove('hidden');
+
+    try {
+        frameIdx = Math.max(0, Math.min(frameIdx, numFrames - 1));
+        currentFrame = frameIdx;
+
+        const frameNum = frameIdx + 1;
+        const url = `${BASE_URL}/frame/${currentClipId}/${frameNum}`;
+
+        await Promise.all([
+            loadImage(annotatedImg, url),
+            loadImage(originalImg, url)
+        ]);
+
+        const displayW = annotatedImg.offsetWidth  || annotatedImg.naturalWidth  || 1920;
+        const displayH = annotatedImg.offsetHeight || annotatedImg.naturalHeight || 1080;
+        canvas.width  = displayW;
+        canvas.height = displayH;
+        canvas.style.width  = '100%';
+        canvas.style.height = 'auto';
+
+        imgNaturalW = annotatedImg.naturalWidth  || 1920;
+        imgNaturalH = annotatedImg.naturalHeight || 1080;
+
+        scrubber.value = frameIdx;
+        frameCounter.textContent = `Frame ${frameNum} / ${numFrames}`;
+        document.getElementById('statFrame').textContent = frameNum;
+
+        drawBoxes(frameIdx);
+        updateSidebar(frameIdx);
+
+        // Preload next two frames in background
+        const next1 = (frameIdx + 1) % numFrames;
+        const next2 = (frameIdx + 2) % numFrames;
+        preloadFrame(currentClipId, next1);
+        preloadFrame(currentClipId, next2);
+    } finally {
+        navigating = false;
+        frameLoading.classList.add('hidden');
+    }
+}
+
+function loadImage(imgEl, url) {
+    return new Promise(resolve => {
+        const absUrl = new URL(url, window.location.origin).href;
+        // Already loaded in the visible element
+        if (imgEl.complete && imgEl.naturalWidth > 0 && imgEl.src === absUrl) {
+            resolve(); return;
+        }
+        // Already cached in preload cache — copy src directly (instant)
+        const cached = preloadCache[absUrl];
+        if (cached && cached.complete && cached.naturalWidth > 0) {
+            imgEl.src = cached.src;
+            if (imgEl.complete) { resolve(); return; }
+            imgEl.onload  = () => resolve();
+            imgEl.onerror = () => resolve();
+            return;
+        }
+        imgEl.onload  = () => resolve();
+        imgEl.onerror = () => resolve();
+        imgEl.src = url;
+    });
+}
+
+function drawBoxes(frameIdx) {
+    const dets = framesData[String(frameIdx)] || [];
+
+    const cw = annotatedImg.offsetWidth  || canvas.width  || 1920;
+    const ch = annotatedImg.offsetHeight || canvas.height || 1080;
+    canvas.width  = cw;
+    canvas.height = ch;
+
+    const scaleX = cw / imgNaturalW;
+    const scaleY = ch / imgNaturalH;
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    const hasHL = highlightTrack !== -1;
+
+    dets.forEach(det => {
+        const [x1, y1, x2, y2] = det.bbox;
+        const color = groupColors[det.group_id] || '#FFFFFF';
+        const isHL      = det.track_id === highlightTrack;
+        const sameGroup = hasHL && !isHL && det.group_id === (framesData[currentFrame]?.find(d => d.track_id === highlightTrack)?.group_id);
+        const alpha = !hasHL ? 1.0 : isHL ? 1.0 : sameGroup ? 0.70 : 0.30;
+        const lw    = !hasHL ? 2.5 : isHL ? 4.0 : sameGroup ? 2.5  : 1.5;
+
+        const sx = x1 * scaleX, sy = y1 * scaleY;
+        const sw = (x2 - x1) * scaleX, sh = (y2 - y1) * scaleY;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = lw;
+        ctx.strokeRect(sx, sy, sw, sh);
+
+        const label    = `ID ${det.track_id}`;
+        const fontSize = Math.max(9, Math.round(11 * scaleY));
+        ctx.font = `bold ${fontSize}px Segoe UI`;
+        const tw   = ctx.measureText(label).width;
+        const tagH = Math.max(14, Math.round(16 * scaleY));
+        const pad  = 3;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(sx, Math.max(0, sy - tagH), tw + pad * 2, tagH);
+
+        ctx.fillStyle = '#000';
+        ctx.fillText(label, sx + pad, Math.max(tagH * 0.75, sy - tagH * 0.25));
+
+        ctx.restore();
+    });
+}
+
+function updateSidebar(frameIdx) {
+    const dets = framesData[String(frameIdx)] || [];
+    document.getElementById('statTracks').textContent = dets.length;
+
+    if (dets.length === 0) {
+        trackList.innerHTML = '<div style="color:#999;font-style:italic;font-size:13px;padding:8px 0;">No detections</div>';
+        return;
+    }
+
+    // Sort by group_id then track_id, matching finegrained sidebar style
+    const sorted = [...dets].sort((a, b) => a.group_id - b.group_id || a.track_id - b.track_id);
+
+    trackList.innerHTML = sorted.map((det, i) => {
+        const color = groupColors[det.group_id] || '#aaa';
+        const isHL  = det.track_id === highlightTrack;
+        const [x1, y1, x2, y2] = det.bbox;
+        return `<div class="track-item${isHL ? ' highlighted' : ''}" data-trackid="${det.track_id}" style="border-left-color:${color}">
+            <div class="item-header">
+                <span style="color:${color}">Group ${det.group_id} - ID ${det.track_id}</span>
+            </div>
+            <div class="item-coords">[${x1}, ${y1}, ${x2}, ${y2}]</div>
+        </div>`;
+    }).join('');
+
+    trackList.querySelectorAll('.track-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const tid = parseInt(el.dataset.trackid, 10);
+            highlightTrack = (highlightTrack === tid) ? -1 : tid;
+            drawBoxes(currentFrame);
+            updateSidebar(currentFrame);
+        });
+    });
+}
+
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (imgNaturalW / rect.width);
+    const my = (e.clientY - rect.top)  * (imgNaturalH / rect.height);
+
+    const dets = framesData[String(currentFrame)] || [];
+    let hit = -1;
+    for (let i = dets.length - 1; i >= 0; i--) {
+        const [x1, y1, x2, y2] = dets[i].bbox;
+        if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) { hit = dets[i].track_id; break; }
+    }
+    highlightTrack = (hit !== -1 && hit === highlightTrack) ? -1 : hit;
+    drawBoxes(currentFrame);
+    updateSidebar(currentFrame);
+});
+
+function startAnimation() {
+    isPlaying = true;
+    playBtn.innerHTML = '&#9646;&#9646;';
+    lastStepTime = 0;
+    animHandle = requestAnimationFrame(animLoop);
+}
+
+function stopAnimation() {
+    isPlaying = false;
+    if (animHandle) { cancelAnimationFrame(animHandle); animHandle = null; }
+    playBtn.innerHTML = '&#9654;';
+}
+
+function animLoop(timestamp) {
+    if (!isPlaying) return;
+    const interval = 1000 / fps;
+    if (timestamp - lastStepTime >= interval) {
+        lastStepTime = timestamp;
+        if (!navigating) {
+            const next = (currentFrame + 1) % numFrames;
+            navigateTo(next, false);  // no overlay flash during playback
+        }
+    }
+    animHandle = requestAnimationFrame(animLoop);
+}
+
+playBtn.addEventListener('click', () => {
+    if (isPlaying) stopAnimation(); else startAnimation();
+});
+
+speedSelect.addEventListener('change', () => {
+    fps = parseInt(speedSelect.value, 10);
+});
+
+scrubber.addEventListener('input', () => {
+    navigateTo(parseInt(scrubber.value, 10));
+});
+
+document.getElementById('prevFrameBtn').addEventListener('click', () => { navigateTo(currentFrame - 1); });
+document.getElementById('nextFrameBtn').addEventListener('click', () => { navigateTo(currentFrame + 1); });
+
+document.getElementById('prevClipBtn').addEventListener('click', () => {
+    if (currentClipId > 1) loadNewClip(currentClipId - 1);
+});
+document.getElementById('nextClipBtn').addEventListener('click', () => {
+    if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1);
+});
+document.getElementById('goClipBtn').addEventListener('click', () => {
+    const v = parseInt(clipInput.value, 10);
+    if (v >= 1 && v <= TOTAL_CLIPS) loadNewClip(v);
+});
+clipInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('goClipBtn').click();
+});
+
+document.addEventListener('keydown', e => {
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    switch (e.key) {
+        case ' ': playBtn.click(); e.preventDefault(); break;
+        case 'ArrowLeft':  case 'a': navigateTo(currentFrame - 1); e.preventDefault(); break;
+        case 'ArrowRight': case 'd': navigateTo(currentFrame + 1); e.preventDefault(); break;
+        case 'q': case 'Q': if (currentClipId > 1) loadNewClip(currentClipId - 1); break;
+        case 'e': case 'E': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
+        case 'Escape':
+            highlightTrack = -1;
+            drawBoxes(currentFrame);
+            updateSidebar(currentFrame);
+            break;
+    }
+});
+
+window.addEventListener('resize', () => { drawBoxes(currentFrame); });
+
+function loadNewClip(clipId) {
+    currentClipId = clipId;
+    clipInput.value = clipId;
+    history.pushState({}, '', `/tracking_visualizer/${clipId}`);
+    loadClip(clipId);
+}
+
+(async () => {
+    fps = parseInt(speedSelect.value, 10);
+    await loadClip(CLIP_ID);
+    // Warm up preload cache for first several frames
+    for (let i = 1; i < Math.min(5, numFrames); i++) {
+        preloadFrame(currentClipId, i);
+    }
+})();
+</script>
+</body>
+</html>

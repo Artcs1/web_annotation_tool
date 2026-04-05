@@ -47,12 +47,20 @@ class VideoAnnotationApp:
         self.VIDEOS_DIR = self.BASE_DIR / "videos"
         self.ANNOTATIONS_FILE = self.BASE_DIR / "results" / "all_annotations.json"
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
-        
+        self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "tracking_annotations.json"
         self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
 
+        if self.TRACKING_ANNOTATIONS_FILE.exists():
+            with open(self.TRACKING_ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
+                self.TRACKING_ANNOTATIONS = json.load(f)
+            print(f"[INFO] Loaded tracking annotations: {len(self.TRACKING_ANNOTATIONS)} clips")
+        else:
+            self.TRACKING_ANNOTATIONS = {}
+            print("[WARN] Tracking annotations file not found")
+            
         if self.FINEGRAINED_ANNOTATIONS_FILE.exists():
             with open(self.FINEGRAINED_ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
                 self.FINEGRAINED_ANNOTATIONS = json.load(f)
@@ -1157,8 +1165,46 @@ class VideoAnnotationApp:
             if not os.path.exists(frame_full):
                 return jsonify({'error': 'Frame not found'}), 404
             return send_from_directory(folder_path, frame_name)
-
         
+        ##################################
+        ### TRACKING    VISUALIZER ANN ###       
+        ##################################
+        
+        @self.app.route('/tracking_visualizer')
+        @self.app.route('/tracking_visualizer/<int:clip_id>')
+        def tracking_visualizer(clip_id=1):
+            """Visualizer for tracking annotations — plays all 50 frames"""
+            total_clips = len(self.TRACKING_ANNOTATIONS)
+            clip_key = str(clip_id)
+            num_frames = len(self.TRACKING_ANNOTATIONS.get(clip_key, {}))
+            return render_template(
+                'tracking_visualizer.html',
+                clip_id=clip_id,
+                total_clips=total_clips,
+                num_frames=num_frames,
+            )
+
+        @self.app.route('/api/tracking_visualizer/annotations/<int:clip_id>')
+        def tracking_visualizer_annotations(clip_id):
+            """Return all frame tracking data for a clip"""
+            clip_key = str(clip_id)
+            data = self.TRACKING_ANNOTATIONS.get(clip_key, {})
+            return jsonify({'success': True, 'clip_id': clip_id, 'frames': data})
+
+        @self.app.route('/api/tracking_visualizer/frame/<int:clip_id>/<int:frame_id>')
+        def tracking_visualizer_frame(clip_id, frame_id):
+            """Serve a specific frame image for the tracking visualizer (frame_id is 1-indexed)"""
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            frame_full = os.path.join(folder_path, frame_name)
+            if not os.path.exists(frame_full):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+
+
         ####################
         ### MISCELANIOUS ###       
         ####################
