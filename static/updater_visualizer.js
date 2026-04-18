@@ -1043,7 +1043,7 @@ class VideoAnnotationTool {
         const annotation = {
             timestamp: new Date().toISOString(),
             videoIndex: this.currentVideoIndex + 1,
-            globalIndex: this.globalVideoIndex,
+            globalIndex: parseInt((video.folder.match(/\d+/) || [])[0], 10),
             videoFolder: video.folder,
             videoWatched: this.hasWatchedVideo,
             totalWatchTimeMs: this.totalWatchTime + (this.videoPlayStartTime ? (Date.now() - this.videoPlayStartTime) : 0),
