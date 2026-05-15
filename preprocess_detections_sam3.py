@@ -36,7 +36,7 @@ except ImportError as e:
 
 # Paths
 BASE_DIR = Path(__file__).parent
-ANNOTATIONS_FILE = BASE_DIR / "coarse_group" / "all_annotations.json"
+ANNOTATIONS_FILE = BASE_DIR / "results" / "all_annotations.json"
 VIDEOS_DIR = BASE_DIR / "videos"
 CACHE_FILE = BASE_DIR / "detections_cache_sam3.json"
 
@@ -203,75 +203,76 @@ def process_videos():
         inference_state = None
 
         # ========== STAGE 1: Coarse patch detection ==========
-        if len(coarse_groups) > 0:
-            # Sort groups by area (small to large) for better detection in crowded areas
+        #if len(coarse_groups) > 0:
+        #    # Sort groups by area (small to large) for better detection in crowded areas
 
 
-            sorted_groups = sorted(
-                coarse_groups,
-                key=lambda g: (g["bbox"][2] - g["bbox"][0]) * (g["bbox"][3] - g["bbox"][1])
-            )
+        #    sorted_groups = sorted(
+        #        coarse_groups,
+        #        key=lambda g: (g["bbox"][2] - g["bbox"][0]) * (g["bbox"][3] - g["bbox"][1])
+        #    )
 
-            for group in sorted_groups:
-                gx1, gy1, gx2, gy2 = [int(x) for x in group["bbox"]]
-                gx1, gy1 = max(0, gx1), max(0, gy1)
-                gx2, gy2 = min(w, gx2), min(h, gy2)
-                if gx2 <= gx1 or gy2 <= gy1:
-                    continue
-            
-                # Store original patch boundaries
-                orig_gx1, orig_gy1 = gx1, gy1
-                orig_gx2, orig_gy2 = gx2, gy2
-            
-                # Expand by 1/4 in each direction
-                patch_w = gx2 - gx1
-                patch_h = gy2 - gy1
-                expand_w = patch_w // 3
-                expand_h = patch_h // 3
-            
-                # Apply expansion and clamp to image bounds
-                expanded_gx1 = max(0, gx1 - expand_w)
-                expanded_gy1 = max(0, gy1 - expand_h)
-                expanded_gx2 = min(w, gx2 + expand_w)
-                expanded_gy2 = min(h, gy2 + expand_h)
-            
-                # Extract expanded patch
-                patch = image_rgb[expanded_gy1:expanded_gy2, expanded_gx1:expanded_gx2]
-                if patch.size == 0:
-                    continue
-                patch_pil = Image.fromarray(patch)
+        #    for group in sorted_groups:
+        #        gx1, gy1, gx2, gy2 = [int(x) for x in group["bbox"]]
+        #        gx1, gy1 = max(0, gx1), max(0, gy1)
+        #        gx2, gy2 = min(w, gx2), min(h, gy2)
+        #        if gx2 <= gx1 or gy2 <= gy1:
+        #            continue
+        #    
+        #        # Store original patch boundaries
+        #        orig_gx1, orig_gy1 = gx1, gy1
+        #        orig_gx2, orig_gy2 = gx2, gy2
+        #    
+        #        # Expand by 1/4 in each direction
+        #        patch_w = gx2 - gx1
+        #        patch_h = gy2 - gy1
+        #        expand_w = patch_w // 3
+        #        expand_h = patch_h // 3
+        #    
+        #        # Apply expansion and clamp to image bounds
+        #        expanded_gx1 = max(0, gx1 - expand_w)
+        #        expanded_gy1 = max(0, gy1 - expand_h)
+        #        expanded_gx2 = min(w, gx2 + expand_w)
+        #        expanded_gy2 = min(h, gy2 + expand_h)
+        #    
+        #        # Extract expanded patch
+        #        patch = image_rgb[expanded_gy1:expanded_gy2, expanded_gx1:expanded_gx2]
+        #        if patch.size == 0:
+        #            continue
+        #        patch_pil = Image.fromarray(patch)
 
-                #patch_pil.show()
-            
-                # Detect on expanded patch
-                dets, inference_state = detect_persons_sam3(
-                    patch_pil, processor, inference_state, confidence_threshold=0.70
-                )
-            
-                # Adjust bbox to full image coordinates and filter
-                for det in dets:
-                    # Convert to full image coordinates
-                    det_x1 = det["bbox"][0] + expanded_gx1
-                    det_y1 = det["bbox"][1] + expanded_gy1
-                    det_x2 = det["bbox"][2] + expanded_gx1
-                    det_y2 = det["bbox"][3] + expanded_gy1
-            
-                    # Check if any corner is inside original patch
-                    corners = [
-                        ((det_x1+det_x2)//2, (det_y1+det_y2)//2),  # center
-                    ]
-            
-                    has_corner_inside = any(
-                        orig_gx1 <= cx < orig_gx2 and orig_gy1 <= cy < orig_gy2
-                        for cx, cy in corners
-                    )
-            
-                    if has_corner_inside:
-                        det["bbox"] = [det_x1, det_y1, det_x2, det_y2]
-                        det["source"] = "coarse_patch"
-                        all_detections.append(det)
-                        coarse_patch_detections += 1
-                        
+        #        #patch_pil.show()
+        #    
+        #        # Detect on expanded patch
+        #        dets, inference_state = detect_persons_sam3(
+        #            patch_pil, processor, inference_state, confidence_threshold=0.70
+        #        )
+        #    
+        #        # Adjust bbox to full image coordinates and filter
+        #        for det in dets:
+        #            # Convert to full image coordinates
+        #            det_x1 = det["bbox"][0] + expanded_gx1
+        #            det_y1 = det["bbox"][1] + expanded_gy1
+        #            det_x2 = det["bbox"][2] + expanded_gx1
+        #            det_y2 = det["bbox"][3] + expanded_gy1
+        #    
+        #            # Check if any corner is inside original patch
+        #            corners = [
+        #                ((det_x1+det_x2)//2, (det_y1+det_y2)//2),  # center
+        #            ]
+        #    
+        #            has_corner_inside = any(
+        #                orig_gx1 <= cx < orig_gx2 and orig_gy1 <= cy < orig_gy2
+        #                for cx, cy in corners
+        #            )
+        #    
+        #            if has_corner_inside:
+        #                det["bbox"] = [det_x1, det_y1, det_x2, det_y2]
+        #                det["source"] = "coarse_patch"
+        #                all_detections.append(det)
+        #                coarse_patch_detections += 1
+        #                
+
 #            for group in sorted_groups:
 #                gx1, gy1, gx2, gy2 = [int(x) for x in group["bbox"]]
 #                gx1, gy1 = max(0, gx1), max(0, gy1)

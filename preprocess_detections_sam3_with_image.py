@@ -38,8 +38,8 @@ except ImportError as e:
 
 # Paths
 BASE_DIR = Path(__file__).parent
-ANNOTATIONS_FILE = BASE_DIR / "coarse_group" / "all_annotations.json"
-VIDEOS_DIR = BASE_DIR / "videos"
+ANNOTATIONS_FILE = BASE_DIR / "results" / "all_annotations.json"
+VIDEOS_DIR = BASE_DIR / "SEKAI_540_3"/ "videos_frames"
 CACHE_FILE = BASE_DIR / "detections_cache_sam3.json"
 VIZ_DIR = BASE_DIR / "visualizations"
 VIZ_DIR.mkdir(exist_ok=True)
@@ -81,7 +81,7 @@ def detect_persons_sam3(image_pil, processor, inference_state, confidence_thresh
     try:
         # Set image
         inference_state = processor.set_image(image_pil)
-        
+
         # Prompt with text: "person"
         output = processor.set_text_prompt(
             state=inference_state, 
@@ -407,7 +407,9 @@ def process_videos():
                 f"[WARNING] Checkpoint not found at {MODEL_CHECKPOINT}. Downloading from HuggingFace..."
             )
             model = build_sam3_image_model()
+        #model = model.to(DEVICE).float()
         processor = Sam3Processor(model)
+        #processor = Sam3Processor(model)
         print("[INFO] SAM3 model loaded successfully")
     except Exception as e:
         print(f"[ERROR] Failed to load SAM3 model: {e}")
@@ -445,6 +447,7 @@ def process_videos():
 
         # Load frame
         frame_path = VIDEOS_DIR / f"clip_{video_index:04d}" / f"{frame_index + 1:05d}.jpeg"
+        print(frame_path)
         if not frame_path.exists():
             continue
 

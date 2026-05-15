@@ -661,8 +661,8 @@ class VideoAnnotationApp:
                 start_index = int(rand_number*self.number_of_clips)
 
 
-                #for f in reversed(self.choices_annotatedframe):
-                for f in self.choices_annotatedframe:
+                for f in reversed(self.choices_annotatedframe):
+                #for f in self.choices_annotatedframe:
                     if (rand_number, f) in set(possible_choices):
                         annotatedFrame = f
                         break
