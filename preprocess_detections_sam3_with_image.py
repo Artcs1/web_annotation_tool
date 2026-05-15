@@ -214,10 +214,10 @@ def visualize_patch_detections(image_rgb, orig_patch_bounds, expanded_patch_boun
                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1)
     
     # Save if path provided
-    if save_path:
-        vis_image_bgr = cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(str(save_path), vis_image_bgr)
-        print(f"[INFO] Saved visualization to {save_path}")
+    #if save_path:
+        #vis_image_bgr = cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR)
+        #cv2.imwrite(str(save_path), vis_image_bgr)
+        #print(f"[INFO] Saved visualization to {save_path}")
     
     # Show visualization
     vis_image_bgr = cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR)
@@ -255,18 +255,18 @@ def visualize_full_image_results(image_rgb, final_detections, removed_detections
             cv2.line(vis_image, (gx2, y), (gx2, min(y + dash_length, gy2)), (128, 128, 128), 2)
     
     # Draw removed/duplicate detections (semi-transparent red with X)
-    for det in removed_detections:
-        x1, y1, x2, y2 = [int(x) for x in det["bbox"]]
-        # Draw thin red box
-        cv2.rectangle(vis_image, (x1, y1), (x2, y2), (255, 100, 100), 1)
-        # Draw X through the box
-        cv2.line(vis_image, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        cv2.line(vis_image, (x2, y1), (x1, y2), (255, 0, 0), 2)
-        # Label with source
-        source_label = "P" if det["source"] == "coarse_patch" else "F"
-        cv2.putText(vis_image, f'{source_label} {det["confidence"]:.2f}', 
-                   (x1, y1 - 5), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
+    #for det in removed_detections:
+    #    x1, y1, x2, y2 = [int(x) for x in det["bbox"]]
+    #    # Draw thin red box
+    #    cv2.rectangle(vis_image, (x1, y1), (x2, y2), (255, 100, 100), 1)
+    #    # Draw X through the box
+    #    cv2.line(vis_image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    #    cv2.line(vis_image, (x2, y1), (x1, y2), (255, 0, 0), 2)
+    #    # Label with source
+    #    source_label = "P" if det["source"] == "coarse_patch" else "F"
+    #    cv2.putText(vis_image, f'{source_label} {det["confidence"]:.2f}', 
+    #               (x1, y1 - 5), 
+    #               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
     
     # Count detections by source
     patch_count = sum(1 for d in final_detections if d["source"] == "coarse_patch")
@@ -318,9 +318,10 @@ def visualize_full_image_results(image_rgb, final_detections, removed_detections
                (legend_x + 5, y_offset), 
                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
     y_offset += 20
-    cv2.putText(vis_image, f'Removed (Dedup): {len(removed_detections)}', 
-               (legend_x + 5, y_offset), 
-               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 100, 100), 1)
+
+    #cv2.putText(vis_image, f'Removed (Dedup): {len(removed_detections)}', 
+    #           (legend_x + 5, y_offset), 
+    #           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 100, 100), 1)
     
     # Legend items
     y_offset += 30
@@ -341,22 +342,22 @@ def visualize_full_image_results(image_rgb, final_detections, removed_detections
     cv2.putText(vis_image, 'Full Img Detection', (legend_x + 30, y_offset + 12), 
                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
     
-    y_offset += 22
-    cv2.rectangle(vis_image, (legend_x + 5, y_offset), (legend_x + 25, y_offset + 15), 
-                 (255, 100, 100), 1)
-    cv2.line(vis_image, (legend_x + 5, y_offset), (legend_x + 25, y_offset + 15), (255, 0, 0), 2)
-    cv2.line(vis_image, (legend_x + 25, y_offset), (legend_x + 5, y_offset + 15), (255, 0, 0), 2)
-    cv2.putText(vis_image, 'Removed (IoU>0.5)', (legend_x + 30, y_offset + 12), 
-               cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+    #y_offset += 22
+    #cv2.rectangle(vis_image, (legend_x + 5, y_offset), (legend_x + 25, y_offset + 15), 
+    #             (255, 100, 100), 1)
+    #cv2.line(vis_image, (legend_x + 5, y_offset), (legend_x + 25, y_offset + 15), (255, 0, 0), 2)
+    #cv2.line(vis_image, (legend_x + 25, y_offset), (legend_x + 5, y_offset + 15), (255, 0, 0), 2)
+    #cv2.putText(vis_image, 'Removed (IoU>0.5)', (legend_x + 30, y_offset + 12), 
+    #           cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
     
     # Add title
-    title = f'Frame {frame_index} - Final Results (2-Stage + Dedup)'
-    title_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-    title_x = image_rgb.shape[1] - title_size[0] - 20
-    cv2.putText(vis_image, title, (title_x, 35), 
-               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 3)
-    cv2.putText(vis_image, title, (title_x, 35), 
-               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+    #title = f'Frame {frame_index} - Final Results (2-Stage + Dedup)'
+    #title_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+    #title_x = image_rgb.shape[1] - title_size[0] - 20
+    #cv2.putText(vis_image, title, (title_x, 35), 
+    #           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 3)
+    #cv2.putText(vis_image, title, (title_x, 35), 
+    #           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
     
     # Save if path provided
     if save_path:
