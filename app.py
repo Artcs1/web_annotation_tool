@@ -47,7 +47,7 @@ class VideoAnnotationApp:
         self.VIDEOS_DIR = self.BASE_DIR / "videos"
         self.ANNOTATIONS_FILE = self.BASE_DIR / "results" / "all_annotations.json"
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
-        self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "tracking_annotations.json"
+        self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" /  "tracking_annotations.json"
         self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3_v1.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
@@ -1250,5 +1250,5 @@ video_app = VideoAnnotationApp()
 app = video_app.app
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8889)
         

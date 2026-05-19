@@ -238,7 +238,7 @@ def abs_to_rel_coords(coords, IMG_WIDTH, IMG_HEIGHT, coord_type="point"):
     else:
         raise ValueError(f"Unknown coord_type: {coord_type}")
         
-files = glob.glob('SEKAI_540_3/videos_frames/*')
+files = glob.glob('SEKAI_900_3/videos_frames/*')
 files.sort()
 
 with open('results/finegrained_all_annotations.json', 'r') as f:
@@ -313,7 +313,9 @@ for id_video, video_path in enumerate(files):
     #video_annotations = defaultdict(list)
 
     track_to_group= {i:i for i in range(100)}
-    videoIndex = int(video_path[-1].split('_')[0])
+    print(video_path)
+    videoIndex = int(video_path.split('_')[-1])
+    print(videoIndex)
     matched_ann = [ann for ann in finegrained_annotations['annotations'] if ann['videoIndex'] == videoIndex] # CHANGE
     
     uf = UnionFind(10000)
@@ -351,10 +353,11 @@ for id_video, video_path in enumerate(files):
     predictor.handle_request(request=dict(type="close_session", session_id=session_id))
 
 
-    if id_video % 100 == 0:
-        with open('tracking_annotations.json', 'w') as f:
+    if id_video % 10 == 0:
+        print('Saving - ID: ', id_video)
+        with open('results/tracking_annotations.json', 'w') as f:
             json.dump(dict(video_annotations), f)
 
-with open('tracking_annotations.json', 'w') as f:
+with open('results/tracking_annotations.json', 'w') as f:
     json.dump(dict(video_annotations), f)
         
