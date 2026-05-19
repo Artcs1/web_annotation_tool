@@ -237,6 +237,7 @@ def abs_to_rel_coords(coords, IMG_WIDTH, IMG_HEIGHT, coord_type="point"):
         ]
     else:
         raise ValueError(f"Unknown coord_type: {coord_type}")
+       
         
 files = glob.glob('SEKAI_900_3/videos_frames/*')
 files.sort()
@@ -247,7 +248,10 @@ with open('results/finegrained_all_annotations.json', 'r') as f:
 video_annotations = defaultdict(lambda: defaultdict(list))    
 
 for id_video, video_path in enumerate(files):
-    print(id_video)    
+    print(id_video)
+    #if id_video != 18:
+    #    continue
+        
     if isinstance(video_path, str) and video_path.endswith(".mp4"):
         cap = cv2.VideoCapture(video_path)
         video_frames_for_vis = []
@@ -296,21 +300,8 @@ for id_video, video_path in enumerate(files):
     )
     out = response["outputs"]
     
-    # plt.close("all")
-    # visualize_formatted_frame_output(frame_idx,video_frames_for_vis,outputs_list=[prepare_masks_for_visualization({frame_idx: out})],titles=["SAM 3 Dense Tracking outputs"],figsize=(6, 4),)
-    
     outputs_per_frame = propagate_in_video(predictor, session_id)
-    #print(len(outputs_per_frame))
     outputs_per_frame = prepare_masks_for_visualization(outputs_per_frame)
-    #print(len(outputs_per_frame))
-
-    #vis_frame_stride = 1
-    #plt.close("all")
-    
-    #for frame_idx in range(0, len(outputs_per_frame), vis_frame_stride):
-    #    visualize_formatted_frame_output(frame_idx,video_frames_for_vis,outputs_list=[outputs_per_frame],titles=["SAM 3 Dense Tracking outputs"],figsize=(6, 4),)
-    
-    #video_annotations = defaultdict(list)
 
     track_to_group= {i:i for i in range(100)}
     print(video_path)
@@ -334,25 +325,37 @@ for id_video, video_path in enumerate(files):
         for bs in groups.values():
             for b in bs[1:]:
                 uf.union(bs[0], b)
+
+        
+    exceptions = []
+    for ann in matched_ann:
+        del_boxes = {0: ann['deleted_groups']}
+        track_to_bbox = {tid: min_bounding_box(mask) for tid, mask in outputs_per_frame[ann['videoInfo']['annotationFrame']].items()}
+        matches = match_boxes(del_boxes, track_to_bbox)        
+        for a, b, _ in matches:
+            exceptions.append(b)
+
     
     for fig_id, detection in enumerate(outputs_per_frame.values()):
         flag = False
         for track_id in detection:
-            mask = detection[track_id]
-            bbox = min_bounding_box(mask)
-            annotation = {}
-            annotation['bbox'] = [int(x) for x in [bbox[1], bbox[0], bbox[3], bbox[2]]]
-            annotation['track_id'] = int(track_id)
-            annotation['group_id'] = uf.parent[track_id]
-            video_annotations[id_video+1][fig_id].append(annotation)
-            flag = True
-        
+            if track_id not in exceptions:
+                mask = detection[track_id]
+                bbox = min_bounding_box(mask)
+                annotation = {}
+                annotation['bbox'] = [int(x) for x in [bbox[1], bbox[0], bbox[3], bbox[2]]]
+                annotation['track_id'] = int(track_id)
+                annotation['group_id'] = uf.parent[track_id]
+                video_annotations[id_video+1][fig_id].append(annotation)
+                flag = True
+            
         if flag == False:
             video_annotations[id_video+1][fig_id].append({})
 
     predictor.handle_request(request=dict(type="close_session", session_id=session_id))
 
 
+    
     if id_video % 10 == 0:
         print('Saving - ID: ', id_video)
         with open('results/tracking_annotations.json', 'w') as f:
@@ -360,4 +363,4 @@ for id_video, video_path in enumerate(files):
 
 with open('results/tracking_annotations.json', 'w') as f:
     json.dump(dict(video_annotations), f)
-        
+ 
