@@ -1204,6 +1204,51 @@ class VideoAnnotationApp:
                 return jsonify({'error': 'Frame not found'}), 404
             return send_from_directory(folder_path, frame_name)
 
+        ##################################
+        ### ACTIVITY    VISUALIZER ANN ###       
+        ##################################
+
+        @self.app.route('/activity_annotation')
+        @self.app.route('/activity_annotation/<int:clip_id>')
+        @self.app.route('/activity_annotation/<int:clip_id>/<int:frame_id>')
+        def activity_annotation(clip_id=1, frame_id=1):
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            num_frames = len(glob.glob(os.path.join(folder_path, f'*{self.FRAME_EXTENSION}')))
+            total_clips = len(glob.glob(self.VIDEO_BASE_PATH + '/*'))
+            return render_template(
+                'activity_annotation.html',
+                clip_id=clip_id,
+                frame_id=frame_id,
+                total_clips=total_clips,
+                num_frames=num_frames,
+            )    
+             
+        @self.app.route('/api/activity_annotation/annotation_frame/<int:clip_id>/<int:frame_id>')
+        def activity_annotation_static_frame(clip_id, frame_id):
+            """Serve the fixed annotation frame (the static image shown at the top)"""
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            if not os.path.exists(os.path.join(folder_path, frame_name)):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+             
+        @self.app.route('/api/activity_annotation/frame/<int:clip_id>/<int:frame_id>')
+        def activity_annotation_frame(clip_id, frame_id):
+            """Serve a preview frame (video scrubber)"""
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            if not os.path.exists(os.path.join(folder_path, frame_name)):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+
+
 
         ####################
         ### MISCELANIOUS ###       
