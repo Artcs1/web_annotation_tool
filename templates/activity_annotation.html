@@ -1,855 +1,997 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Activity Annotation — Clip {{ clip_id }}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        display: flex;
+        gap: 30px;
+        padding: 30px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
+        max-width: 1700px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* ── Left panel ── */
+      .left-panel {
+        flex: 4;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      /* ── Right panel ── */
+      .right-panel {
+        flex: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+      }
+
+      /* ── Header bar ── */
+      .header-bar {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 15px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 20px;
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      /* ── Video / image panels ── */
+      .video-panel {
+        background: #000;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .section-label {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 10px 18px;
+        font-weight: 600;
+        font-size: 14px;
+        text-align: center;
+        flex-shrink: 0;
+      }
+
+      .section-label.preview {
+        background: linear-gradient(45deg, #4a4a6a, #2c2c4a);
+      }
+
+      .canvas-wrapper {
+        position: relative;
+        background: #1a1a1a;
+        line-height: 0;
+      }
+
+      .canvas-wrapper img {
+        display: block;
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+      }
+
+      .canvas-wrapper canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 15px;
+        font-weight: 600;
+        z-index: 20;
+      }
+
+      .loading-overlay.hidden {
+        display: none;
+      }
+
+      /* ── Playback bar ── */
+      .playback-bar {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 15px;
+        padding: 16px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .playback-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .play-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        transition:
+          transform 0.1s,
+          opacity 0.15s;
+      }
+
+      .play-btn:hover {
+        transform: scale(1.08);
+      }
+
+      .speed-select {
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+        background: white;
+        font-size: 13px;
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .speed-select:focus {
+        border-color: #667eea;
+      }
+
+      .speed-label {
+        font-size: 13px;
+        color: #666;
+      }
+
+      .step-btn {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        background: rgba(102, 126, 234, 0.15);
+        color: #667eea;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+      }
+
+      .step-btn:hover {
+        background: rgba(102, 126, 234, 0.25);
+        transform: translateY(-1px);
+      }
+
+      .frame-counter {
+        font-size: 14px;
+        font-weight: 700;
+        color: #333;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+
+      .scrubber-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .scrubber-row input[type="range"] {
+        flex: 1;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: #e0e0e0;
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .scrubber-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+      }
+
+      .scrubber-label {
+        color: #999;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      /* ── Right-panel cards ── */
+      .panel {
+        background: rgba(255, 255, 255, 0.8);
+        padding: 18px;
+        border-radius: 15px;
+      }
+
+      .panel h3 {
+        color: #333;
+        margin-bottom: 12px;
+        font-size: 15px;
+      }
+
+      /* ── Clip navigator ── */
+      .nav-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .nav-btn {
+        flex: 1;
+        padding: 10px 0;
+        border: none;
+        border-radius: 25px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: white;
+      }
+
+      .nav-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+      .nav-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn-prev {
+        background: linear-gradient(45deg, #ff9800, #f57c00);
+      }
+      .btn-next {
+        background: linear-gradient(45deg, #4caf50, #45a049);
+      }
+
+      .clip-picker {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .clip-picker label {
+        font-weight: 600;
+        color: #555;
+        font-size: 14px;
+      }
+
+      .clip-picker input[type="number"] {
+        width: 80px;
+        padding: 8px 10px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        font-size: 14px;
+        text-align: center;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .clip-picker input[type="number"]:focus {
+        border-color: #667eea;
+      }
+
+      .clip-total {
+        font-size: 13px;
+        color: #888;
+      }
+
+      .go-btn {
+        padding: 8px 18px;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .go-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      /* ── Task summary ── */
+      .task-banner {
+        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+        color: white;
+        padding: 18px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(46, 125, 50, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+      }
+
+      .task-banner h3 {
+        font-size: 16px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .task-banner p {
+        font-size: 14px;
+        line-height: 1.65;
+        opacity: 0.95;
+        margin: 0;
+      }
+
+      /* ── Activity form ── */
+      .activity-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .activity-form label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #555;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .activity-form select,
+      .activity-form textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+        background: white;
+        color: #333;
+      }
+
+      .activity-form select:focus,
+      .activity-form textarea:focus {
+        border-color: #667eea;
+      }
+
+      .activity-form textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      /* ── Submit button ── */
+      .submit-btn {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 18px rgba(102, 126, 234, 0.4);
+      }
+
+      .submit-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+      }
+      .submit-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* ── Stats ── */
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      }
+
+      .stat-row:last-child {
+        border-bottom: none;
+      }
+      .stat-key {
+        color: #777;
+      }
+      .stat-value {
+        font-weight: 700;
+        color: #333;
+      }
+
+      /* ── Keyboard shortcuts ── */
+      .shortcuts {
+        font-size: 12px;
+        color: #666;
+        line-height: 1.6;
+      }
+      .shortcuts h4 {
+        color: #333;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+      .shortcut-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 4px 0;
+      }
+      .shortcut-key {
+        background: #f0f0f0;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-weight: 600;
+        color: #667eea;
+        font-size: 12px;
+      }
+
+      /* ── Global loading spinner ── */
+      #globalLoading {
+        position: fixed;
+        inset: 0;
+        background: rgba(100, 95, 180, 0.55);
+        backdrop-filter: blur(4px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+        color: white;
+        gap: 16px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .spinner {
+        width: 44px;
+        height: 44px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
+      }
 
+      #globalLoading.hidden {
+        display: none;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 1100px) {
         .container {
-            display: flex;
-            gap: 30px;
-            padding: 30px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            max-width: 1700px;
-            width: 100%;
-            margin: 0 auto;
+          flex-direction: column;
         }
-
-        /* ── Left panel ── */
-        .left-panel {
-            flex: 4;
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-            min-width: 0;
-        }
-
-        /* ── Right panel ── */
         .right-panel {
-            flex: 3;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            overflow-y: auto;
+          flex: none;
         }
-
-        /* ── Header bar ── */
-        .header-bar {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 15px;
-            text-align: center;
-            font-weight: 700;
-            font-size: 20px;
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        /* ── Video / image panels ── */
-        .video-panel {
-            background: #000;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .section-label {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            padding: 10px 18px;
-            font-weight: 600;
-            font-size: 14px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .section-label.preview {
-            background: linear-gradient(45deg, #4a4a6a, #2c2c4a);
-        }
-
-        .canvas-wrapper {
-            position: relative;
-            background: #1a1a1a;
-            line-height: 0;
-        }
-
-        .canvas-wrapper img {
-            display: block;
-            width: 100%;
-            height: auto;
-            object-fit: contain;
-        }
-
-        .canvas-wrapper canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-        }
-
-        .loading-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 15px;
-            font-weight: 600;
-            z-index: 20;
-        }
-
-        .loading-overlay.hidden { display: none; }
-
-        /* ── Playback bar ── */
-        .playback-bar {
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 15px;
-            padding: 16px 22px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .playback-top {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .play-btn {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
-            transition: transform 0.1s, opacity 0.15s;
-        }
-
-        .play-btn:hover { transform: scale(1.08); }
-
-        .speed-select {
-            padding: 7px 10px;
-            border-radius: 8px;
-            border: 2px solid #ddd;
-            background: white;
-            font-size: 13px;
-            cursor: pointer;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .speed-select:focus { border-color: #667eea; }
-
-        .speed-label { font-size: 13px; color: #666; }
-
-        .step-btn {
-            padding: 8px 14px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 13px;
-            background: rgba(102, 126, 234, 0.15);
-            color: #667eea;
-            transition: background 0.15s, transform 0.1s;
-        }
-
-        .step-btn:hover { background: rgba(102, 126, 234, 0.25); transform: translateY(-1px); }
-
-        .frame-counter {
-            font-size: 14px;
-            font-weight: 700;
-            color: #333;
-            margin-left: auto;
-            white-space: nowrap;
-        }
-
-        .scrubber-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .scrubber-row input[type="range"] {
-            flex: 1;
-            height: 6px;
-            -webkit-appearance: none;
-            appearance: none;
-            background: #e0e0e0;
-            border-radius: 3px;
-            outline: none;
-            cursor: pointer;
-        }
-
-        .scrubber-row input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #667eea;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
-        }
-
-        .scrubber-label { color: #999; font-size: 11px; white-space: nowrap; }
-
-        /* ── Right-panel cards ── */
-        .panel {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 18px;
-            border-radius: 15px;
-        }
-
-        .panel h3 {
-            color: #333;
-            margin-bottom: 12px;
-            font-size: 15px;
-        }
-
-        /* ── Clip navigator ── */
-        .nav-controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        .nav-btn {
-            flex: 1;
-            padding: 10px 0;
-            border: none;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            color: white;
-        }
-
-        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        .nav-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .btn-prev { background: linear-gradient(45deg, #ff9800, #f57c00); }
-        .btn-next { background: linear-gradient(45deg, #4CAF50, #45a049); }
-
-        .clip-picker {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .clip-picker label { font-weight: 600; color: #555; font-size: 14px; }
-
-        .clip-picker input[type="number"] {
-            width: 80px;
-            padding: 8px 10px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 14px;
-            text-align: center;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .clip-picker input[type="number"]:focus { border-color: #667eea; }
-
-        .clip-total { font-size: 13px; color: #888; }
-
-        .go-btn {
-            padding: 8px 18px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .go-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
-
-        /* ── Task summary ── */
-        .task-banner {
-            background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
-            color: white;
-            padding: 18px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(46, 125, 50, 0.3);
-            border: 2px solid rgba(255,255,255,0.15);
-        }
-
-        .task-banner h3 {
-            font-size: 16px;
-            font-weight: 800;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .task-banner p {
-            font-size: 14px;
-            line-height: 1.65;
-            opacity: 0.95;
-            margin: 0;
-        }
-
-        /* ── Activity form ── */
-        .activity-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .activity-form label {
-            font-size: 14px;
-            font-weight: 600;
-            color: #555;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .activity-form select,
-        .activity-form textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: inherit;
-            outline: none;
-            transition: border-color 0.2s;
-            background: white;
-            color: #333;
-        }
-
-        .activity-form select:focus,
-        .activity-form textarea:focus { border-color: #667eea; }
-
-        .activity-form textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        /* ── Submit button ── */
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 18px rgba(102, 126, 234, 0.4);
-        }
-
-        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5); }
-        .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-
-        /* ── Stats ── */
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.06);
-        }
-
-        .stat-row:last-child { border-bottom: none; }
-        .stat-key   { color: #777; }
-        .stat-value { font-weight: 700; color: #333; }
-
-        /* ── Keyboard shortcuts ── */
-        .shortcuts { font-size: 12px; color: #666; line-height: 1.6; }
-        .shortcuts h4 { color: #333; margin-bottom: 8px; font-size: 14px; }
-        .shortcut-row { display: flex; justify-content: space-between; margin: 4px 0; }
-        .shortcut-key {
-            background: #f0f0f0;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-weight: 600;
-            color: #667eea;
-            font-size: 12px;
-        }
-
-        /* ── Global loading spinner ── */
-        #globalLoading {
-            position: fixed;
-            inset: 0;
-            background: rgba(100, 95, 180, 0.55);
-            backdrop-filter: blur(4px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-            color: white;
-            gap: 16px;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .spinner {
-            width: 44px;
-            height: 44px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        #globalLoading.hidden { display: none; }
-
-        /* ── Responsive ── */
-        @media (max-width: 1100px) {
-            .container { flex-direction: column; }
-            .right-panel { flex: none; }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <!-- Global loading screen -->
+    <div id="globalLoading">
+      <div class="spinner"></div>
+      <span>Loading clip&#8230;</span>
+    </div>
 
-<!-- Global loading screen -->
-<div id="globalLoading">
-    <div class="spinner"></div>
-    <span>Loading clip&#8230;</span>
-</div>
-
-<div class="container">
-
-    <!-- ═══════════════ LEFT PANEL ═══════════════ -->
-    <div class="left-panel">
-
+    <div class="container">
+      <!-- ═══════════════ LEFT PANEL ═══════════════ -->
+      <div class="left-panel">
         <div class="header-bar" id="headerBar">
-            &#127916; Activity Annotation &#8212; Clip <span id="headerClip">{{ clip_id | default(1) | int }}</span>&nbsp;/&nbsp;{{ total_clips | default(1) | int }}
+          &#127916; Activity Annotation &#8212; Clip
+          <span id="headerClip">{{ clip_id | default(1) | int }}</span
+          >&nbsp;/&nbsp;{{ total_clips | default(1) | int }}
         </div>
 
         <!-- Annotation frame (static image, top) -->
         <div class="video-panel">
-            <div class="section-label">&#127919; Annotation Frame</div>
-            <div class="canvas-wrapper" id="annotationWrapper">
-                <img id="annotationImg" src="" alt="Annotation frame" draggable="false">
-                <canvas id="overlayCanvas"></canvas>
-                <div class="loading-overlay hidden" id="frameLoading">Loading&#8230;</div>
+          <div class="section-label">&#127919; Annotated Frame</div>
+          <div class="canvas-wrapper" id="annotationWrapper">
+            <img
+              id="annotationImg"
+              src=""
+              alt="Annotation frame"
+              draggable="false"
+            />
+            <canvas id="overlayCanvas"></canvas>
+            <div class="loading-overlay hidden" id="frameLoading">
+              Loading&#8230;
             </div>
+          </div>
         </div>
 
         <!-- Video preview (scrubable, bottom) -->
         <div class="video-panel">
-            <div class="section-label preview">&#127909; Video Preview — Watch to Understand Context</div>
-            <div class="canvas-wrapper" id="previewWrapper">
-                <img id="previewImg" src="" alt="Video frame" draggable="false">
-            </div>
+          <div class="section-label preview">
+            &#127909; Video Preview — Watch to Understand Context
+          </div>
+          <div class="canvas-wrapper" id="previewWrapper">
+            <img id="previewImg" src="" alt="Video frame" draggable="false" />
+          </div>
         </div>
 
         <!-- Playback controls -->
         <div class="playback-bar">
-            <div class="playback-top">
-                <button class="play-btn" id="playBtn" title="Play / Pause (Space)">&#9654;</button>
-                <select class="speed-select" id="speedSelect">
-                    <option value="5">0.5&#215;</option>
-                    <option value="10" selected>1&#215;</option>
-                    <option value="20">2&#215;</option>
-                </select>
-                <span class="speed-label">Speed</span>
-                <button class="step-btn" id="prevFrameBtn" title="Previous frame">&#9664; Frame</button>
-                <button class="step-btn" id="nextFrameBtn" title="Next frame">Frame &#9654;</button>
-                <span class="frame-counter" id="frameCounter">Frame 1 / —</span>
-            </div>
-            <div class="scrubber-row">
-                <span class="scrubber-label">1</span>
-                <input type="range" id="scrubber" min="0" max="49" value="0" step="1">
-                <span class="scrubber-label" id="scrubberMax">50</span>
-            </div>
+          <div class="playback-top">
+            <button class="play-btn" id="playBtn" title="Play / Pause (Space)">
+              &#9654;
+            </button>
+            <select class="speed-select" id="speedSelect">
+              <option value="5">0.5&#215;</option>
+              <option value="10" selected>1&#215;</option>
+              <option value="20">2&#215;</option>
+            </select>
+            <span class="speed-label">Speed</span>
+            <button class="step-btn" id="prevFrameBtn" title="Previous frame">
+              &#9664; Frame
+            </button>
+            <button class="step-btn" id="nextFrameBtn" title="Next frame">
+              Frame &#9654;
+            </button>
+            <span class="frame-counter" id="frameCounter">Frame 1 / —</span>
+          </div>
+          <div class="scrubber-row">
+            <span class="scrubber-label">1</span>
+            <input
+              type="range"
+              id="scrubber"
+              min="0"
+              max="49"
+              value="0"
+              step="1"
+            />
+            <span class="scrubber-label" id="scrubberMax">50</span>
+          </div>
         </div>
+      </div>
+      <!-- /left-panel -->
 
-    </div><!-- /left-panel -->
-
-    <!-- ═══════════════ RIGHT PANEL ═══════════════ -->
-    <div class="right-panel">
-
+      <!-- ═══════════════ RIGHT PANEL ═══════════════ -->
+      <div class="right-panel">
         <!-- Task summary banner -->
         <div class="task-banner">
-            <h3>&#128203; Task</h3>
-            <p>
-                Watch the video clip and review the highlighted annotation frame.
-                Select the <strong>activity label</strong> that best describes what the people
-                in the scene are doing, then submit your annotation.
-            </p>
+          <h3>&#128203; Task</h3>
+          <p>
+            Watch the video clip and review the highlighted annotated frame.
+            Rate the <strong>suggested activity labels</strong> on a scale of
+            <strong>1 to 5</strong> that best describes what the people in the
+            scene are doing , then submit your rating. If there is no correct
+            label, <strong>provide a short description</strong> of what is
+            happening in the scene in the provided box.
+          </p>
         </div>
 
         <!-- Annotation form -->
         <div class="panel">
-            <h3>&#127991; Annotate Activity</h3>
-            <div class="activity-form">
-
-                <div>
-                    <label for="activitySelect">Activity Label</label>
-                    <select id="activitySelect">
-                        <option value="" disabled selected>— Select an activity —</option>
-                        <optgroup label="Locomotion">
-                            <option value="walking">Walking</option>
-                            <option value="running">Running</option>
-                            <option value="standing">Standing</option>
-                            <option value="sitting">Sitting</option>
-                        </optgroup>
-                        <optgroup label="Social">
-                            <option value="talking">Talking / Conversing</option>
-                            <option value="greeting">Greeting</option>
-                            <option value="queuing">Queuing</option>
-                        </optgroup>
-                        <optgroup label="Object Interaction">
-                            <option value="using_phone">Using Phone</option>
-                            <option value="carrying">Carrying Object</option>
-                            <option value="pushing">Pushing / Pulling</option>
-                        </optgroup>
-                        <optgroup label="Other">
-                            <option value="unknown">Unknown / Unclear</option>
-                            <option value="other">Other</option>
-                        </optgroup>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="notesInput">Notes (optional)</label>
-                    <textarea id="notesInput" placeholder="Describe anything unusual or add context…"></textarea>
-                </div>
-
-                <button class="submit-btn" id="submitBtn" disabled>Submit Annotation</button>
+          <h3>&#127991; Annotate Activity</h3>
+          <div class="activity-form">
+            <div>
+              <label for="activitySelect">Activity Label</label>
+              <select id="activitySelect">
+                <option value="" disabled selected>
+                  — Select an activity —
+                </option>
+                <optgroup label="Locomotion">
+                  <option value="walking">Walking</option>
+                  <option value="running">Running</option>
+                  <option value="standing">Standing</option>
+                  <option value="sitting">Sitting</option>
+                </optgroup>
+                <optgroup label="Social">
+                  <option value="talking">Talking / Conversing</option>
+                  <option value="greeting">Greeting</option>
+                  <option value="queuing">Queuing</option>
+                </optgroup>
+                <optgroup label="Object Interaction">
+                  <option value="using_phone">Using Phone</option>
+                  <option value="carrying">Carrying Object</option>
+                  <option value="pushing">Pushing / Pulling</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="unknown">Unknown / Unclear</option>
+                  <option value="other">Other</option>
+                </optgroup>
+              </select>
             </div>
+
+            <div>
+              <label for="notesInput">Notes (optional)</label>
+              <textarea
+                id="notesInput"
+                placeholder="Describe anything unusual or add context…"
+              ></textarea>
+            </div>
+
+            <button class="submit-btn" id="submitBtn" disabled>
+              Submit Annotation
+            </button>
+          </div>
         </div>
 
         <!-- Stats -->
         <div class="panel">
-            <h3>&#128202; Clip Info</h3>
-            <div class="stat-row">
-                <span class="stat-key">Clip</span>
-                <span class="stat-value" id="statClip">{{ clip_id | default(1) | int }}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-key">Annotation frame</span>
-                <span class="stat-value" id="statAnnotationFrame">{{ frame_id | default(1) | int }}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-key">Current preview frame</span>
-                <span class="stat-value" id="statCurrentFrame">1</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-key">Total frames</span>
-                <span class="stat-value" id="statTotal">—</span>
-            </div>
+          <h3>&#128202; Clip Info</h3>
+          <div class="stat-row">
+            <span class="stat-key">Clip</span>
+            <span class="stat-value" id="statClip"
+              >{{ clip_id | default(1) | int }}</span
+            >
+          </div>
+          <div class="stat-row">
+            <span class="stat-key">Annotation frame</span>
+            <span class="stat-value" id="statAnnotationFrame"
+              >{{ frame_id | default(1) | int }}</span
+            >
+          </div>
+          <div class="stat-row">
+            <span class="stat-key">Current preview frame</span>
+            <span class="stat-value" id="statCurrentFrame">1</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-key">Total frames</span>
+            <span class="stat-value" id="statTotal">—</span>
+          </div>
         </div>
 
         <!-- Clip navigation -->
         <div class="panel">
-            <h3>&#128194; Navigate Clips</h3>
-            <div class="nav-controls">
-                <button class="nav-btn btn-prev" id="prevClipBtn">&#9664; Prev</button>
-                <button class="nav-btn btn-next" id="nextClipBtn">Next &#9654;</button>
-            </div>
-            <div class="clip-picker">
-                <label for="clipInput">Clip</label>
-                <input type="number" id="clipInput" min="1" max="{{ total_clips | default(1) | int }}" value="{{ clip_id | default(1) | int }}">
-                <span class="clip-total">/ {{ total_clips | default(1) | int }}</span>
-                <button class="go-btn" id="goClipBtn">Go</button>
-            </div>
+          <h3>&#128194; Navigate Clips</h3>
+          <div class="nav-controls">
+            <button class="nav-btn btn-prev" id="prevClipBtn">
+              &#9664; Prev
+            </button>
+            <button class="nav-btn btn-next" id="nextClipBtn">
+              Next &#9654;
+            </button>
+          </div>
+          <div class="clip-picker">
+            <label for="clipInput">Clip</label>
+            <input
+              type="number"
+              id="clipInput"
+              min="1"
+              max="{{ total_clips | default(1) | int }}"
+              value="{{ clip_id | default(1) | int }}"
+            />
+            <span class="clip-total"
+              >/ {{ total_clips | default(1) | int }}</span
+            >
+            <button class="go-btn" id="goClipBtn">Go</button>
+          </div>
         </div>
 
         <!-- Keyboard shortcuts -->
         <div class="panel shortcuts">
-            <h4>&#9000;&#65039; Keyboard Shortcuts</h4>
-            <div class="shortcut-row"><span>Play / Pause</span><span class="shortcut-key">Space</span></div>
-            <div class="shortcut-row"><span>Prev frame</span><span class="shortcut-key">&#8592; / A</span></div>
-            <div class="shortcut-row"><span>Next frame</span><span class="shortcut-key">&#8594; / D</span></div>
-            <div class="shortcut-row"><span>Prev clip</span><span class="shortcut-key">Q</span></div>
-            <div class="shortcut-row"><span>Next clip</span><span class="shortcut-key">E</span></div>
-            <div class="shortcut-row"><span>Jump to clip</span><span class="shortcut-key">Enter</span></div>
+          <h4>&#9000;&#65039; Keyboard Shortcuts</h4>
+          <div class="shortcut-row">
+            <span>Play / Pause</span><span class="shortcut-key">Space</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Prev frame</span><span class="shortcut-key">&#8592; / A</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Next frame</span><span class="shortcut-key">&#8594; / D</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Prev clip</span><span class="shortcut-key">Q</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Next clip</span><span class="shortcut-key">E</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Jump to clip</span><span class="shortcut-key">Enter</span>
+          </div>
         </div>
+      </div>
+      <!-- /right-panel -->
+    </div>
+    <!-- /container -->
 
-    </div><!-- /right-panel -->
-</div><!-- /container -->
+    <script>
+      const CLIP_ID      = {{ clip_id     | default(1)  | int }};
+      const TOTAL_CLIPS  = {{ total_clips | default(1)  | int }};
+      const FRAME_ID     = {{ frame_id    | default(1)  | int }};
+      const NUM_FRAMES   = {{ num_frames  | default(50) | int }};
+      const BASE_URL     = '/api/activity_annotation';
 
-<script>
-const CLIP_ID      = {{ clip_id     | default(1)  | int }};
-const TOTAL_CLIPS  = {{ total_clips | default(1)  | int }};
-const FRAME_ID     = {{ frame_id    | default(1)  | int }};
-const NUM_FRAMES   = {{ num_frames  | default(50) | int }};
-const BASE_URL     = '/api/activity_annotation';
+      // ── State ──────────────────────────────────────────────────────────────────
+      let currentClipId = CLIP_ID;
+      let currentFrame  = 0;          // 0-indexed preview frame
+      let numFrames     = NUM_FRAMES;
+      let isPlaying     = false;
+      let animHandle    = null;
+      let lastStepTime  = 0;
+      let fps           = 10;
+      let navigating    = false;
 
-// ── State ──────────────────────────────────────────────────────────────────
-let currentClipId = CLIP_ID;
-let currentFrame  = 0;          // 0-indexed preview frame
-let numFrames     = NUM_FRAMES;
-let isPlaying     = false;
-let animHandle    = null;
-let lastStepTime  = 0;
-let fps           = 10;
-let navigating    = false;
+      // ── DOM refs ────────────────────────────────────────────────────────────────
+      const annotationImg  = document.getElementById('annotationImg');
+      const previewImg     = document.getElementById('previewImg');
+      const canvas         = document.getElementById('overlayCanvas');
+      const playBtn        = document.getElementById('playBtn');
+      const scrubber       = document.getElementById('scrubber');
+      const frameCounter   = document.getElementById('frameCounter');
+      const speedSelect    = document.getElementById('speedSelect');
+      const globalLoading  = document.getElementById('globalLoading');
+      const frameLoading   = document.getElementById('frameLoading');
+      const clipInput      = document.getElementById('clipInput');
+      const activitySelect = document.getElementById('activitySelect');
+      const submitBtn      = document.getElementById('submitBtn');
 
-// ── DOM refs ────────────────────────────────────────────────────────────────
-const annotationImg  = document.getElementById('annotationImg');
-const previewImg     = document.getElementById('previewImg');
-const canvas         = document.getElementById('overlayCanvas');
-const playBtn        = document.getElementById('playBtn');
-const scrubber       = document.getElementById('scrubber');
-const frameCounter   = document.getElementById('frameCounter');
-const speedSelect    = document.getElementById('speedSelect');
-const globalLoading  = document.getElementById('globalLoading');
-const frameLoading   = document.getElementById('frameLoading');
-const clipInput      = document.getElementById('clipInput');
-const activitySelect = document.getElementById('activitySelect');
-const submitBtn      = document.getElementById('submitBtn');
+      // Enable submit once an activity is chosen
+      activitySelect.addEventListener('change', () => {
+          submitBtn.disabled = !activitySelect.value;
+      });
 
-// Enable submit once an activity is chosen
-activitySelect.addEventListener('change', () => {
-    submitBtn.disabled = !activitySelect.value;
-});
+      // ── Frame preload cache ─────────────────────────────────────────────────────
+      const preloadCache = {};
 
-// ── Frame preload cache ─────────────────────────────────────────────────────
-const preloadCache = {};
+      function preloadFrame(clipId, frameIdx) {
+          const frameNum = frameIdx + 1;
+          const url = `${BASE_URL}/frame/${clipId}/${frameNum}`;
+          const abs = new URL(url, window.location.origin).href;
+          if (preloadCache[abs]) return;
+          const img = new Image();
+          img.src = url;
+          preloadCache[abs] = img;
+      }
 
-function preloadFrame(clipId, frameIdx) {
-    const frameNum = frameIdx + 1;
-    const url = `${BASE_URL}/frame/${clipId}/${frameNum}`;
-    const abs = new URL(url, window.location.origin).href;
-    if (preloadCache[abs]) return;
-    const img = new Image();
-    img.src = url;
-    preloadCache[abs] = img;
-}
+      function loadImage(el, url) {
+          return new Promise(resolve => {
+              const abs = new URL(url, window.location.origin).href;
+              if (el.complete && el.naturalWidth > 0 && el.src === abs) { resolve(); return; }
+              const cached = preloadCache[abs];
+              if (cached && cached.complete && cached.naturalWidth > 0) {
+                  el.src = cached.src;
+                  if (el.complete) { resolve(); return; }
+                  el.onload = el.onerror = () => resolve();
+                  return;
+              }
+              el.onload = el.onerror = () => resolve();
+              el.src = url;
+          });
+      }
 
-function loadImage(el, url) {
-    return new Promise(resolve => {
-        const abs = new URL(url, window.location.origin).href;
-        if (el.complete && el.naturalWidth > 0 && el.src === abs) { resolve(); return; }
-        const cached = preloadCache[abs];
-        if (cached && cached.complete && cached.naturalWidth > 0) {
-            el.src = cached.src;
-            if (el.complete) { resolve(); return; }
-            el.onload = el.onerror = () => resolve();
-            return;
-        }
-        el.onload = el.onerror = () => resolve();
-        el.src = url;
-    });
-}
+      // ── Navigation ──────────────────────────────────────────────────────────────
+      async function navigateTo(frameIdx, showOverlay = true) {
+          if (navigating) return;
+          navigating = true;
+          if (showOverlay) frameLoading.classList.remove('hidden');
 
-// ── Navigation ──────────────────────────────────────────────────────────────
-async function navigateTo(frameIdx, showOverlay = true) {
-    if (navigating) return;
-    navigating = true;
-    if (showOverlay) frameLoading.classList.remove('hidden');
+          try {
+              frameIdx = Math.max(0, Math.min(frameIdx, numFrames - 1));
+              currentFrame = frameIdx;
 
-    try {
-        frameIdx = Math.max(0, Math.min(frameIdx, numFrames - 1));
-        currentFrame = frameIdx;
+              const frameNum = frameIdx + 1;
+              await loadImage(previewImg, `${BASE_URL}/frame/${currentClipId}/${frameNum}`);
 
-        const frameNum = frameIdx + 1;
-        await loadImage(previewImg, `${BASE_URL}/frame/${currentClipId}/${frameNum}`);
+              scrubber.value = frameIdx;
+              frameCounter.textContent = `Frame ${frameNum} / ${numFrames}`;
+              document.getElementById('statCurrentFrame').textContent = frameNum;
 
-        scrubber.value = frameIdx;
-        frameCounter.textContent = `Frame ${frameNum} / ${numFrames}`;
-        document.getElementById('statCurrentFrame').textContent = frameNum;
+              // Preload next two frames
+              preloadFrame(currentClipId, frameIdx + 1);
+              preloadFrame(currentClipId, frameIdx + 2);
+          } finally {
+              navigating = false;
+              frameLoading.classList.add('hidden');
+          }
+      }
 
-        // Preload next two frames
-        preloadFrame(currentClipId, frameIdx + 1);
-        preloadFrame(currentClipId, frameIdx + 2);
-    } finally {
-        navigating = false;
-        frameLoading.classList.add('hidden');
-    }
-}
+      // ── Clip loading ────────────────────────────────────────────────────────────
+      async function loadClip(clipId) {
+          const wasPlaying = isPlaying;
+          stopAnimation();
+          globalLoading.classList.remove('hidden');
 
-// ── Clip loading ────────────────────────────────────────────────────────────
-async function loadClip(clipId) {
-    const wasPlaying = isPlaying;
-    stopAnimation();
-    globalLoading.classList.remove('hidden');
+          // Clear preload cache
+          for (const k of Object.keys(preloadCache)) delete preloadCache[k];
 
-    // Clear preload cache
-    for (const k of Object.keys(preloadCache)) delete preloadCache[k];
+          // Reset annotation form
+          activitySelect.value = '';
+          submitBtn.disabled = true;
+          document.getElementById('notesInput').value = '';
 
-    // Reset annotation form
-    activitySelect.value = '';
-    submitBtn.disabled = true;
-    document.getElementById('notesInput').value = '';
+          try {
+              // Load static annotation frame
+              await loadImage(annotationImg, `${BASE_URL}/annotation_frame/${clipId}/${FRAME_ID}`);
 
-    try {
-        // Load static annotation frame
-        await loadImage(annotationImg, `${BASE_URL}/annotation_frame/${clipId}/${FRAME_ID}`);
+              // Update info
+              document.getElementById('headerClip').textContent    = clipId;
+              document.getElementById('statClip').textContent      = clipId;
+              document.getElementById('statAnnotationFrame').textContent = FRAME_ID;
+              document.getElementById('statTotal').textContent     = numFrames;
+              clipInput.value = clipId;
 
-        // Update info
-        document.getElementById('headerClip').textContent    = clipId;
-        document.getElementById('statClip').textContent      = clipId;
-        document.getElementById('statAnnotationFrame').textContent = FRAME_ID;
-        document.getElementById('statTotal').textContent     = numFrames;
-        clipInput.value = clipId;
+              scrubber.max = Math.max(0, numFrames - 1);
+              document.getElementById('scrubberMax').textContent = numFrames;
 
-        scrubber.max = Math.max(0, numFrames - 1);
-        document.getElementById('scrubberMax').textContent = numFrames;
+              await navigateTo(0);
+              if (wasPlaying) startAnimation();
+          } finally {
+              globalLoading.classList.add('hidden');
+          }
+      }
 
-        await navigateTo(0);
-        if (wasPlaying) startAnimation();
-    } finally {
-        globalLoading.classList.add('hidden');
-    }
-}
+      // ── Playback ─────────────────────────────────────────────────────────────
+      function startAnimation() {
+          isPlaying = true;
+          playBtn.innerHTML = '&#9646;&#9646;';
+          lastStepTime = 0;
+          animHandle = requestAnimationFrame(animLoop);
+      }
 
-// ── Playback ─────────────────────────────────────────────────────────────
-function startAnimation() {
-    isPlaying = true;
-    playBtn.innerHTML = '&#9646;&#9646;';
-    lastStepTime = 0;
-    animHandle = requestAnimationFrame(animLoop);
-}
+      function stopAnimation() {
+          isPlaying = false;
+          if (animHandle) { cancelAnimationFrame(animHandle); animHandle = null; }
+          playBtn.innerHTML = '&#9654;';
+      }
 
-function stopAnimation() {
-    isPlaying = false;
-    if (animHandle) { cancelAnimationFrame(animHandle); animHandle = null; }
-    playBtn.innerHTML = '&#9654;';
-}
+      function animLoop(timestamp) {
+          if (!isPlaying) return;
+          if (timestamp - lastStepTime >= 1000 / fps) {
+              lastStepTime = timestamp;
+              if (!navigating) {
+                  const next = (currentFrame + 1) % numFrames;
+                  navigateTo(next, false);
+              }
+          }
+          animHandle = requestAnimationFrame(animLoop);
+      }
 
-function animLoop(timestamp) {
-    if (!isPlaying) return;
-    if (timestamp - lastStepTime >= 1000 / fps) {
-        lastStepTime = timestamp;
-        if (!navigating) {
-            const next = (currentFrame + 1) % numFrames;
-            navigateTo(next, false);
-        }
-    }
-    animHandle = requestAnimationFrame(animLoop);
-}
+      // ── Event listeners ─────────────────────────────────────────────────────────
+      playBtn.addEventListener('click', () => {
+          if (isPlaying) stopAnimation(); else startAnimation();
+      });
 
-// ── Event listeners ─────────────────────────────────────────────────────────
-playBtn.addEventListener('click', () => {
-    if (isPlaying) stopAnimation(); else startAnimation();
-});
+      speedSelect.addEventListener('change', () => {
+          fps = parseInt(speedSelect.value, 10);
+      });
 
-speedSelect.addEventListener('change', () => {
-    fps = parseInt(speedSelect.value, 10);
-});
+      scrubber.addEventListener('input', () => {
+          navigateTo(parseInt(scrubber.value, 10));
+      });
 
-scrubber.addEventListener('input', () => {
-    navigateTo(parseInt(scrubber.value, 10));
-});
+      document.getElementById('prevFrameBtn').addEventListener('click', () => navigateTo(currentFrame - 1));
+      document.getElementById('nextFrameBtn').addEventListener('click', () => navigateTo(currentFrame + 1));
 
-document.getElementById('prevFrameBtn').addEventListener('click', () => navigateTo(currentFrame - 1));
-document.getElementById('nextFrameBtn').addEventListener('click', () => navigateTo(currentFrame + 1));
+      document.getElementById('prevClipBtn').addEventListener('click', () => {
+          if (currentClipId > 1) loadNewClip(currentClipId - 1);
+      });
+      document.getElementById('nextClipBtn').addEventListener('click', () => {
+          if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1);
+      });
+      document.getElementById('goClipBtn').addEventListener('click', () => {
+          const v = parseInt(clipInput.value, 10);
+          if (v >= 1 && v <= TOTAL_CLIPS) loadNewClip(v);
+      });
+      clipInput.addEventListener('keydown', e => {
+          if (e.key === 'Enter') document.getElementById('goClipBtn').click();
+      });
 
-document.getElementById('prevClipBtn').addEventListener('click', () => {
-    if (currentClipId > 1) loadNewClip(currentClipId - 1);
-});
-document.getElementById('nextClipBtn').addEventListener('click', () => {
-    if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1);
-});
-document.getElementById('goClipBtn').addEventListener('click', () => {
-    const v = parseInt(clipInput.value, 10);
-    if (v >= 1 && v <= TOTAL_CLIPS) loadNewClip(v);
-});
-clipInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('goClipBtn').click();
-});
+      document.addEventListener('keydown', e => {
+          const tag = e.target.tagName;
+          if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+          switch (e.key) {
+              case ' ':          playBtn.click(); e.preventDefault(); break;
+              case 'ArrowLeft':
+              case 'a':          navigateTo(currentFrame - 1); e.preventDefault(); break;
+              case 'ArrowRight':
+              case 'd':          navigateTo(currentFrame + 1); e.preventDefault(); break;
+              case 'q': case 'Q': if (currentClipId > 1)           loadNewClip(currentClipId - 1); break;
+              case 'e': case 'E': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
+          }
+      });
 
-document.addEventListener('keydown', e => {
-    const tag = e.target.tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    switch (e.key) {
-        case ' ':          playBtn.click(); e.preventDefault(); break;
-        case 'ArrowLeft':
-        case 'a':          navigateTo(currentFrame - 1); e.preventDefault(); break;
-        case 'ArrowRight':
-        case 'd':          navigateTo(currentFrame + 1); e.preventDefault(); break;
-        case 'q': case 'Q': if (currentClipId > 1)           loadNewClip(currentClipId - 1); break;
-        case 'e': case 'E': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
-    }
-});
+      // ── Submit ───────────────────────────────────────────────────────────────────
+      submitBtn.addEventListener('click', async () => {
+          const payload = {
+              clipId:           currentClipId,
+              frameId:          FRAME_ID,
+              activityLabel:    activitySelect.value,
+              notes:            document.getElementById('notesInput').value.trim(),
+          };
 
-// ── Submit ───────────────────────────────────────────────────────────────────
-submitBtn.addEventListener('click', async () => {
-    const payload = {
-        clipId:           currentClipId,
-        frameId:          FRAME_ID,
-        activityLabel:    activitySelect.value,
-        notes:            document.getElementById('notesInput').value.trim(),
-    };
+          try {
+              submitBtn.disabled = true;
+              submitBtn.textContent = 'Saving…';
 
-    try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving…';
+              const resp = await fetch(`${BASE_URL}/save-annotation`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+              });
 
-        const resp = await fetch(`${BASE_URL}/save-annotation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+              const json = await resp.json();
+              if (json.success) {
+                  submitBtn.textContent = '✅ Saved!';
+                  setTimeout(() => {
+                      submitBtn.textContent = 'Submit Annotation';
+                      submitBtn.disabled = false;
+                  }, 1500);
+              } else {
+                  throw new Error(json.error || 'Unknown error');
+              }
+          } catch (err) {
+              submitBtn.textContent = '❌ Error — retry?';
+              submitBtn.disabled = false;
+              console.error('Save error:', err);
+          }
+      });
 
-        const json = await resp.json();
-        if (json.success) {
-            submitBtn.textContent = '✅ Saved!';
-            setTimeout(() => {
-                submitBtn.textContent = 'Submit Annotation';
-                submitBtn.disabled = false;
-            }, 1500);
-        } else {
-            throw new Error(json.error || 'Unknown error');
-        }
-    } catch (err) {
-        submitBtn.textContent = '❌ Error — retry?';
-        submitBtn.disabled = false;
-        console.error('Save error:', err);
-    }
-});
+      function loadNewClip(clipId) {
+          currentClipId = clipId;
+          history.pushState({}, '', `/activity_annotation/${clipId}`);
+          loadClip(clipId);
+      }
 
-function loadNewClip(clipId) {
-    currentClipId = clipId;
-    history.pushState({}, '', `/activity_annotation/${clipId}`);
-    loadClip(clipId);
-}
-
-// ── Init ─────────────────────────────────────────────────────────────────────
-(async () => {
-    fps = parseInt(speedSelect.value, 10);
-    await loadClip(CLIP_ID);
-    for (let i = 1; i < Math.min(5, numFrames); i++) {
-        preloadFrame(currentClipId, i);
-    }
-})();
-</script>
-</body>
+      // ── Init ─────────────────────────────────────────────────────────────────────
+      (async () => {
+          fps = parseInt(speedSelect.value, 10);
+          await loadClip(CLIP_ID);
+          for (let i = 1; i < Math.min(5, numFrames); i++) {
+              preloadFrame(currentClipId, i);
+          }
+      })();
+    </script>
+  </body>
 </html>
