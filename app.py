@@ -49,6 +49,7 @@ class VideoAnnotationApp:
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
         self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" /  "tracking_annotations.json"
         self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3_v1.json"
+        self.CULTURAL_GROUPS_FILE = self.BASE_DIR / "results_cultural_540" / "results_cultural_540" / "deepseek-vl2" / "annotations.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
@@ -68,6 +69,14 @@ class VideoAnnotationApp:
         else:
             self.FINEGRAINED_ANNOTATIONS = {'annotations': []}
             print("[WARN] Finegrained annotations file not found")
+
+        if self.CULTURAL_GROUPS_FILE.exists():
+            with open(self.CULTURAL_GROUPS_FILE, 'r', encoding='utf-8') as f:
+                self.CULTURAL_GROUPS = json.load(f)
+            print(f"[INFO] Loaded cultural group boxes (deepseek-vl2): {len(self.CULTURAL_GROUPS.get('annotations', []))} entries")
+        else:
+            self.CULTURAL_GROUPS = {'annotations': []}
+            print("[WARN] Cultural group boxes file (deepseek-vl2) not found")
 
         def load_detections_cache():
             if self.DETECTIONS_CACHE_FILE.exists():
@@ -1247,6 +1256,32 @@ class VideoAnnotationApp:
             if not os.path.exists(os.path.join(folder_path, frame_name)):
                 return jsonify({'error': 'Frame not found'}), 404
             return send_from_directory(folder_path, frame_name)
+
+        @self.app.route('/api/activity_annotation/groups/<int:clip_id>')
+        def activity_annotation_groups(clip_id):
+            """Return group bboxes for all 3 annotated frames of a clip.
+
+            Bbox source is the deepseek-vl2 pseudo-label file, since all 6 models
+            share identical bbox/groupId/confidence values for a given clip+frame.
+            """
+            results = {}
+            for ann in self.CULTURAL_GROUPS.get('annotations', []):
+                if ann['videoIndex'] == clip_id:
+                    frame = ann['videoInfo']['annotationFrame']
+                    groups = [
+                        {
+                            'groupId': g.get('groupId'),
+                            'bbox': g.get('bbox'),
+                            'confidence': g.get('confidence'),
+                        }
+                        for g in ann.get('groups', [])
+                    ]
+                    results[str(frame)] = {
+                        'groups': groups,
+                        'numberOfGroups': ann.get('numberOfGroups', 0),
+                        'videoInfo': ann.get('videoInfo', {}),
+                    }
+            return jsonify({'success': True, 'clip_id': clip_id, 'frames': results})
 
 
 

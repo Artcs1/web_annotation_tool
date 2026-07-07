@@ -1,4 +1,13 @@
+# Environments
+venv/
+.venv/
+env/
 .env
 
+# Data
 /videos
 /results_cultural_540
+
+# Python bytecode
+__pycache__/
+*.py[cod]

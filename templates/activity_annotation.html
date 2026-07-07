@@ -105,6 +105,11 @@
         pointer-events: none;
       }
 
+      #overlayCanvas {
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
       .loading-overlay {
         position: absolute;
         inset: 0;
@@ -256,43 +261,6 @@
       }
 
       /* ── Clip navigator ── */
-      .nav-controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-
-      .nav-btn {
-        flex: 1;
-        padding: 10px 0;
-        border: none;
-        border-radius: 25px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        color: white;
-      }
-
-      .nav-btn:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      }
-      .nav-btn:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      .btn-prev {
-        background: linear-gradient(45deg, #ff9800, #f57c00);
-      }
-      .btn-next {
-        background: linear-gradient(45deg, #4caf50, #45a049);
-      }
-
       .clip-picker {
         display: flex;
         gap: 8px;
@@ -339,6 +307,138 @@
       .go-btn:hover {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      /* ── Navigate Clips panel (single centered row) ── */
+      .nav-panel {
+        padding: 12px 18px;
+      }
+
+      .nav-panel h3 {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .clip-nav-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .nav-divider {
+        width: 1px;
+        height: 24px;
+        background: rgba(0, 0, 0, 0.15);
+        flex-shrink: 0;
+      }
+
+      .clip-step-btn {
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+        border: none;
+        border-radius: 50%;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+
+      .clip-step-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      .clip-step-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .clip-step-btn.prev {
+        background: linear-gradient(45deg, #ff9800, #f57c00);
+      }
+      .clip-step-btn.next {
+        background: linear-gradient(45deg, #4caf50, #45a049);
+      }
+
+      /* ── Frame navigator (Navigate Clips panel) ── */
+      .frame-nav-label {
+        font-weight: 600;
+        color: #555;
+        font-size: 14px;
+      }
+
+      .btn-frame {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        color: white;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        transition: all 0.2s ease;
+      }
+
+      .btn-frame:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-frame.active {
+        box-shadow: 0 0 0 3px #fff, 0 0 0 6px #667eea;
+      }
+
+      /* ── Group navigator (Annotate Activity panel) ── */
+      .group-nav-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+        padding: 8px 10px;
+        background: rgba(102, 126, 234, 0.08);
+        border-radius: 10px;
+      }
+
+      .group-nav-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        color: white;
+        transition: all 0.2s ease;
+      }
+
+      .group-nav-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .group-nav-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .group-nav-btn.prev {
+        background: linear-gradient(45deg, #ff9800, #f57c00);
+      }
+
+      .group-nav-btn.next {
+        background: linear-gradient(45deg, #4caf50, #45a049);
+      }
+
+      .group-counter {
+        font-weight: 700;
+        color: #333;
+        font-size: 14px;
+        white-space: nowrap;
       }
 
       /* ── Task summary ── */
@@ -542,6 +642,38 @@
           >&nbsp;/&nbsp;{{ total_clips | default(1) | int }}
         </div>
 
+        <!-- Clip / frame navigation -->
+        <div class="panel nav-panel">
+          <h3>&#128194; Navigate Clips</h3>
+          <div class="clip-nav-row">
+            <button class="clip-step-btn prev" id="prevClipBtn" title="Previous clip (Q)">
+              &#9664;
+            </button>
+            <div class="clip-picker">
+              <label for="clipInput">Clip</label>
+              <input
+                type="number"
+                id="clipInput"
+                min="1"
+                max="{{ total_clips | default(1) | int }}"
+                value="{{ clip_id | default(1) | int }}"
+              />
+              <span class="clip-total"
+                >/ {{ total_clips | default(1) | int }}</span
+              >
+              <button class="go-btn" id="goClipBtn">Go</button>
+            </div>
+            <button class="clip-step-btn next" id="nextClipBtn" title="Next clip (E)">
+              &#9654;
+            </button>
+            <span class="nav-divider"></span>
+            <span class="frame-nav-label">Frame:</span>
+            <button class="btn-frame" data-frame="1">1</button>
+            <button class="btn-frame" data-frame="21">21</button>
+            <button class="btn-frame" data-frame="41">41</button>
+          </div>
+        </div>
+
         <!-- Annotation frame (static image, top) -->
         <div class="video-panel">
           <div class="section-label">&#127919; Annotated Frame</div>
@@ -623,6 +755,15 @@
         <!-- Annotation form -->
         <div class="panel">
           <h3>&#127991; Annotate Activity</h3>
+          <div class="group-nav-row">
+            <button class="group-nav-btn prev" id="prevGroupBtn" title="Previous group">
+              &#9664; Prev
+            </button>
+            <span class="group-counter" id="groupCounter">Group — / —</span>
+            <button class="group-nav-btn next" id="nextGroupBtn" title="Next group">
+              Next &#9654;
+            </button>
+          </div>
           <div class="activity-form">
             <div>
               <label for="activitySelect">Activity Label</label>
@@ -692,33 +833,6 @@
           </div>
         </div>
 
-        <!-- Clip navigation -->
-        <div class="panel">
-          <h3>&#128194; Navigate Clips</h3>
-          <div class="nav-controls">
-            <button class="nav-btn btn-prev" id="prevClipBtn">
-              &#9664; Prev
-            </button>
-            <button class="nav-btn btn-next" id="nextClipBtn">
-              Next &#9654;
-            </button>
-          </div>
-          <div class="clip-picker">
-            <label for="clipInput">Clip</label>
-            <input
-              type="number"
-              id="clipInput"
-              min="1"
-              max="{{ total_clips | default(1) | int }}"
-              value="{{ clip_id | default(1) | int }}"
-            />
-            <span class="clip-total"
-              >/ {{ total_clips | default(1) | int }}</span
-            >
-            <button class="go-btn" id="goClipBtn">Go</button>
-          </div>
-        </div>
-
         <!-- Keyboard shortcuts -->
         <div class="panel shortcuts">
           <h4>&#9000;&#65039; Keyboard Shortcuts</h4>
@@ -740,6 +854,9 @@
           <div class="shortcut-row">
             <span>Jump to clip</span><span class="shortcut-key">Enter</span>
           </div>
+          <div class="shortcut-row">
+            <span>Jump to frame 1 / 21 / 41</span><span class="shortcut-key">1 2 3</span>
+          </div>
         </div>
       </div>
       <!-- /right-panel -->
@@ -754,14 +871,15 @@
       const BASE_URL     = '/api/activity_annotation';
 
       // ── State ──────────────────────────────────────────────────────────────────
-      let currentClipId = CLIP_ID;
-      let currentFrame  = 0;          // 0-indexed preview frame
-      let numFrames     = NUM_FRAMES;
-      let isPlaying     = false;
-      let animHandle    = null;
-      let lastStepTime  = 0;
-      let fps           = 10;
-      let navigating    = false;
+      let currentClipId  = CLIP_ID;
+      let currentFrameId = FRAME_ID;   // annotation frame (1, 21, or 41)
+      let currentFrame   = 0;          // 0-indexed preview frame
+      let numFrames      = NUM_FRAMES;
+      let isPlaying      = false;
+      let animHandle     = null;
+      let lastStepTime   = 0;
+      let fps            = 10;
+      let navigating     = false;
 
       // ── DOM refs ────────────────────────────────────────────────────────────────
       const annotationImg  = document.getElementById('annotationImg');
@@ -776,6 +894,135 @@
       const clipInput      = document.getElementById('clipInput');
       const activitySelect = document.getElementById('activitySelect');
       const submitBtn      = document.getElementById('submitBtn');
+      const annotationWrapper = document.getElementById('annotationWrapper');
+      const overlayCtx      = canvas.getContext('2d');
+      const prevGroupBtn    = document.getElementById('prevGroupBtn');
+      const nextGroupBtn    = document.getElementById('nextGroupBtn');
+      const groupCounter    = document.getElementById('groupCounter');
+
+      // ── Social-group box overlay state ────────────────────────────────────────
+      let currentGroups     = [];
+      let currentImgW       = 1920;
+      let currentImgH       = 1080;
+      let currentGroupIndex = -1;        // index into currentGroups of the highlighted group
+      const groupAnnotationCache = {};   // clipId -> { frameStr: { groups, videoInfo, ... } }
+
+      const CONF_COLORS = {
+          1: '#2ECC71', 2: '#3498DB', 3: '#F1C40F', 4: '#E67E22', 5: '#E74C3C',
+      };
+      const CONF_FALLBACK = '#BB8FCE';
+      const DIM_COLOR = '#888888';
+      function confColor(confidence) { return CONF_COLORS[confidence] || CONF_FALLBACK; }
+
+      // ── Fetch group boxes for a clip (cached). Bbox source: deepseek-vl2 ─────────
+      async function fetchGroupAnnotations(clipId) {
+          if (groupAnnotationCache[clipId]) return groupAnnotationCache[clipId];
+          const resp = await fetch(`/api/activity_annotation/groups/${clipId}`);
+          const data = await resp.json();
+          groupAnnotationCache[clipId] = data.success ? data.frames : {};
+          return groupAnnotationCache[clipId];
+      }
+
+      // ── Draw social-group boxes on the overlay canvas ─────────────────────────────
+      // highlightIdx selects the group currently being rated: it's drawn at full
+      // color/opacity, every other group is grayed out and dimmed.
+      function drawGroupBoxes(groups, imgWidth, imgHeight, highlightIdx = -1) {
+          const dispW = annotationImg.clientWidth;
+          const dispH = annotationImg.clientHeight;
+          canvas.width  = dispW;
+          canvas.height = dispH;
+
+          overlayCtx.clearRect(0, 0, dispW, dispH);
+          if (!dispW || !dispH) return;
+
+          const scaleX = dispW / imgWidth;
+          const scaleY = dispH / imgHeight;
+          const hasHighlight = highlightIdx >= 0 && highlightIdx < groups.length;
+
+          groups.forEach((g, i) => {
+              const [x1, y1, x2, y2] = g.bbox;
+              const sx = x1 * scaleX;
+              const sy = y1 * scaleY;
+              const sw = (x2 - x1) * scaleX;
+              const sh = (y2 - y1) * scaleY;
+
+              const isSelected = !hasHighlight || i === highlightIdx;
+              const color      = isSelected ? confColor(g.confidence) : DIM_COLOR;
+              const lineWidth  = isSelected ? (hasHighlight ? 4 : 3) : 2;
+
+              overlayCtx.save();
+              overlayCtx.globalAlpha = isSelected ? 1 : 0.8;
+
+              overlayCtx.fillStyle = color + (isSelected ? '30' : '25');
+              overlayCtx.fillRect(sx, sy, sw, sh);
+
+              overlayCtx.strokeStyle = color;
+              overlayCtx.lineWidth = lineWidth;
+              overlayCtx.strokeRect(sx, sy, sw, sh);
+
+              const label = `G${g.groupId != null ? g.groupId : i}  conf:${g.confidence}`;
+              overlayCtx.font = 'bold 14px Segoe UI, sans-serif';
+              const tm = overlayCtx.measureText(label);
+              const lh = 22;
+              const lx = sx;
+              const ly = sy - lh - 2 > 0 ? sy - lh - 2 : sy + 2;
+              overlayCtx.fillStyle = color;
+              overlayCtx.fillRect(lx, ly, tm.width + 12, lh);
+              overlayCtx.fillStyle = '#fff';
+              overlayCtx.fillText(label, lx + 6, ly + 16);
+
+              overlayCtx.restore();
+          });
+      }
+
+      // ── Group nav (Prev/Next within the current frame's groups) ──────────────────
+      function updateGroupNavUI() {
+          if (currentGroups.length === 0) {
+              groupCounter.textContent = 'No groups on this frame';
+              prevGroupBtn.disabled = true;
+              nextGroupBtn.disabled = true;
+          } else {
+              groupCounter.textContent = `Group ${currentGroupIndex + 1} / ${currentGroups.length}`;
+              prevGroupBtn.disabled = currentGroupIndex <= 0;
+              nextGroupBtn.disabled = currentGroupIndex >= currentGroups.length - 1;
+          }
+      }
+
+      function selectGroup(index) {
+          currentGroupIndex = index;
+          updateGroupNavUI();
+          drawGroupBoxes(currentGroups, currentImgW, currentImgH, currentGroupIndex);
+      }
+
+      // Click a box on the annotated frame to make it the active group.
+      // Top-most drawn box wins on overlap, so iterate in reverse draw order.
+      function hitTestGroup(clientX, clientY) {
+          if (!currentGroups || currentGroups.length === 0) return -1;
+          const rect = canvas.getBoundingClientRect();
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+          for (let i = currentGroups.length - 1; i >= 0; i--) {
+              const [x1, y1, x2, y2] = currentGroups[i].bbox;
+              const sx = x1 * (canvas.width  / currentImgW);
+              const sy = y1 * (canvas.height / currentImgH);
+              const sw = (x2 - x1) * (canvas.width  / currentImgW);
+              const sh = (y2 - y1) * (canvas.height / currentImgH);
+              if (x >= sx && x <= sx + sw && y >= sy && y <= sy + sh) return i;
+          }
+          return -1;
+      }
+
+      canvas.addEventListener('click', (e) => {
+          const idx = hitTestGroup(e.clientX, e.clientY);
+          if (idx >= 0) selectGroup(idx);
+      });
+
+      // ── Frame nav (1 / 21 / 41 buttons in Navigate Clips panel) ──────────────────
+      function updateFrameButtons() {
+          document.querySelectorAll('.btn-frame').forEach(btn => {
+              btn.classList.toggle('active', parseInt(btn.dataset.frame, 10) === currentFrameId);
+          });
+      }
 
       // Enable submit once an activity is chosen
       activitySelect.addEventListener('change', () => {
@@ -842,6 +1089,7 @@
           const wasPlaying = isPlaying;
           stopAnimation();
           globalLoading.classList.remove('hidden');
+          updateFrameButtons();
 
           // Clear preload cache
           for (const k of Object.keys(preloadCache)) delete preloadCache[k];
@@ -850,15 +1098,28 @@
           activitySelect.value = '';
           submitBtn.disabled = true;
           document.getElementById('notesInput').value = '';
+          overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
+          currentGroupIndex = -1;
+          updateGroupNavUI();
 
           try {
               // Load static annotation frame
-              await loadImage(annotationImg, `${BASE_URL}/annotation_frame/${clipId}/${FRAME_ID}`);
+              await loadImage(annotationImg, `${BASE_URL}/annotation_frame/${clipId}/${currentFrameId}`);
+
+              // Fetch and draw social-group boxes for this clip/frame
+              const annFrames = await fetchGroupAnnotations(clipId);
+              const annData   = annFrames[String(currentFrameId)] || null;
+              currentGroups = annData ? (annData.groups || []) : [];
+              currentImgW   = annData ? (annData.videoInfo.normalizedWidth  || 1920) : 1920;
+              currentImgH   = annData ? (annData.videoInfo.normalizedHeight || 1080) : 1080;
+              currentGroupIndex = currentGroups.length > 0 ? 0 : -1;
+              updateGroupNavUI();
+              drawGroupBoxes(currentGroups, currentImgW, currentImgH, currentGroupIndex);
 
               // Update info
               document.getElementById('headerClip').textContent    = clipId;
               document.getElementById('statClip').textContent      = clipId;
-              document.getElementById('statAnnotationFrame').textContent = FRAME_ID;
+              document.getElementById('statAnnotationFrame').textContent = currentFrameId;
               document.getElementById('statTotal').textContent     = numFrames;
               clipInput.value = clipId;
 
@@ -907,6 +1168,10 @@
           fps = parseInt(speedSelect.value, 10);
       });
 
+      window.addEventListener('resize', () => {
+          drawGroupBoxes(currentGroups, currentImgW, currentImgH, currentGroupIndex);
+      });
+
       scrubber.addEventListener('input', () => {
           navigateTo(parseInt(scrubber.value, 10));
       });
@@ -928,6 +1193,19 @@
           if (e.key === 'Enter') document.getElementById('goClipBtn').click();
       });
 
+      document.querySelectorAll('.btn-frame').forEach(btn => {
+          btn.addEventListener('click', () => {
+              changeFrame(parseInt(btn.dataset.frame, 10));
+          });
+      });
+
+      prevGroupBtn.addEventListener('click', () => {
+          if (currentGroupIndex > 0) selectGroup(currentGroupIndex - 1);
+      });
+      nextGroupBtn.addEventListener('click', () => {
+          if (currentGroupIndex < currentGroups.length - 1) selectGroup(currentGroupIndex + 1);
+      });
+
       document.addEventListener('keydown', e => {
           const tag = e.target.tagName;
           if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
@@ -939,6 +1217,9 @@
               case 'd':          navigateTo(currentFrame + 1); e.preventDefault(); break;
               case 'q': case 'Q': if (currentClipId > 1)           loadNewClip(currentClipId - 1); break;
               case 'e': case 'E': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
+              case '1':          changeFrame(1);  e.preventDefault(); break;
+              case '2':          changeFrame(21); e.preventDefault(); break;
+              case '3':          changeFrame(41); e.preventDefault(); break;
           }
       });
 
@@ -946,7 +1227,8 @@
       submitBtn.addEventListener('click', async () => {
           const payload = {
               clipId:           currentClipId,
-              frameId:          FRAME_ID,
+              frameId:          currentFrameId,
+              groupId:          currentGroupIndex >= 0 ? currentGroups[currentGroupIndex].groupId : null,
               activityLabel:    activitySelect.value,
               notes:            document.getElementById('notesInput').value.trim(),
           };
@@ -979,9 +1261,17 @@
       });
 
       function loadNewClip(clipId) {
-          currentClipId = clipId;
-          history.pushState({}, '', `/activity_annotation/${clipId}`);
+          currentClipId  = clipId;
+          currentFrameId = 1;   // always start a new clip at frame 1
+          history.pushState({}, '', `/activity_annotation/${clipId}/${currentFrameId}`);
           loadClip(clipId);
+      }
+
+      function changeFrame(frameId) {
+          if (frameId === currentFrameId) return;
+          currentFrameId = frameId;
+          history.pushState({}, '', `/activity_annotation/${currentClipId}/${currentFrameId}`);
+          loadClip(currentClipId);
       }
 
       // ── Init ─────────────────────────────────────────────────────────────────────
