@@ -78,6 +78,37 @@ class VideoAnnotationApp:
             self.CULTURAL_GROUPS = {'annotations': []}
             print("[WARN] Cultural group boxes file (deepseek-vl2) not found")
 
+        # Pseudo activity-label predictions from all 6 VLMs, keyed down to just
+        # (videoIndex, annotationFrame) -> groupId -> group_activity, since the raw
+        # per-model files also carry verbose LLM call logs (group_activity_LMhist,
+        # etc.) that aren't needed here and would otherwise stay resident in memory.
+        self.MODEL_NAMES = [
+            'deepseek-vl2',
+            'gemini',
+            'llava-v1.6-mistral-7b-hf',
+            'Qwen2.5-VL-72B-Instruct',
+            'Qwen2.5-VL-7B-Instruct',
+            'Qwen3-VL-30B-A3B-Instruct',
+        ]
+        self.MODEL_GROUP_ACTIVITY = {}
+        for model_name in self.MODEL_NAMES:
+            model_file = self.BASE_DIR / "results_cultural_540" / "results_cultural_540" / model_name / "annotations.json"
+            if not model_file.exists():
+                print(f"[WARN] Cultural annotations not found for model: {model_name}")
+                continue
+            with open(model_file, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            compact = {}
+            for ann in raw.get('annotations', []):
+                key = (ann['videoIndex'], ann['videoInfo']['annotationFrame'])
+                compact[key] = {
+                    g.get('groupId'): (g.get('cultural_output') or {}).get('group_activity', [])
+                    for g in ann.get('groups', [])
+                }
+            self.MODEL_GROUP_ACTIVITY[model_name] = compact
+            del raw
+            print(f"[INFO] Loaded group_activity predictions for model: {model_name} ({len(compact)} clip-frame entries)")
+
         def load_detections_cache():
             if self.DETECTIONS_CACHE_FILE.exists():
                 print("[INFO] Loading cached detections from", self.DETECTIONS_CACHE_FILE)
@@ -1262,7 +1293,10 @@ class VideoAnnotationApp:
             """Return group bboxes for all 3 annotated frames of a clip.
 
             Bbox source is the deepseek-vl2 pseudo-label file, since all 6 models
-            share identical bbox/groupId/confidence values for a given clip+frame.
+            share identical bbox/groupId values for a given clip+frame. Confidence
+            is intentionally omitted here — it's a per-activity-label score from the
+            annotation pipeline, not a group-detection confidence, so it doesn't
+            belong on the group-box overlay.
             """
             results = {}
             for ann in self.CULTURAL_GROUPS.get('annotations', []):
@@ -1272,7 +1306,6 @@ class VideoAnnotationApp:
                         {
                             'groupId': g.get('groupId'),
                             'bbox': g.get('bbox'),
-                            'confidence': g.get('confidence'),
                         }
                         for g in ann.get('groups', [])
                     ]
@@ -1283,10 +1316,27 @@ class VideoAnnotationApp:
                     }
             return jsonify({'success': True, 'clip_id': clip_id, 'frames': results})
 
+        @self.app.route('/api/activity_annotation/predictions/<int:clip_id>/<int:frame_id>')
+        def activity_annotation_predictions(clip_id, frame_id):
+            """Return each of the 6 models' predicted group_activity, keyed by groupId"""
+            key = (clip_id, frame_id)
+            predictions = {}
+            for model_name in self.MODEL_NAMES:
+                group_map = self.MODEL_GROUP_ACTIVITY.get(model_name, {}).get(key, {})
+                for group_id, activities in group_map.items():
+                    predictions.setdefault(str(group_id), {})[model_name] = activities
+            return jsonify({
+                'success': True,
+                'clip_id': clip_id,
+                'frame_id': frame_id,
+                'models': self.MODEL_NAMES,
+                'predictions': predictions,
+            })
+
 
 
         ####################
-        ### MISCELANIOUS ###       
+        ### MISCELANIOUS ###
         ####################
 
         @self.app.route('/my-annotator-id')

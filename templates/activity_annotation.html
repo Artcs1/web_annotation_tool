@@ -327,13 +327,6 @@
         flex-wrap: wrap;
       }
 
-      .nav-divider {
-        width: 1px;
-        height: 24px;
-        background: rgba(0, 0, 0, 0.15);
-        flex-shrink: 0;
-      }
-
       .clip-step-btn {
         width: 38px;
         height: 38px;
@@ -363,34 +356,6 @@
       }
       .clip-step-btn.next {
         background: linear-gradient(45deg, #4caf50, #45a049);
-      }
-
-      /* ── Frame navigator (Navigate Clips panel) ── */
-      .frame-nav-label {
-        font-weight: 600;
-        color: #555;
-        font-size: 14px;
-      }
-
-      .btn-frame {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 700;
-        cursor: pointer;
-        color: white;
-        background: linear-gradient(45deg, #667eea, #764ba2);
-        transition: all 0.2s ease;
-      }
-
-      .btn-frame:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-      }
-
-      .btn-frame.active {
-        box-shadow: 0 0 0 3px #fff, 0 0 0 6px #667eea;
       }
 
       /* ── Group navigator (Annotate Activity panel) ── */
@@ -506,6 +471,139 @@
       .activity-form textarea {
         resize: vertical;
         min-height: 80px;
+      }
+
+      /* ── Model prediction rows ── */
+      .model-row-header {
+        display: grid;
+        grid-template-columns: 110px 1fr 62px;
+        gap: 10px;
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #999;
+      }
+
+      .model-predictions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .no-predictions {
+        color: #999;
+        font-style: italic;
+        text-align: center;
+        padding: 16px 0;
+        font-size: 13px;
+      }
+
+      .model-row {
+        display: grid;
+        grid-template-columns: 110px 1fr 62px;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 10px;
+        background: white;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+      }
+
+      .model-name {
+        font-weight: 700;
+        font-size: 12px;
+        color: #444;
+        line-height: 1.3;
+        word-break: break-word;
+      }
+
+      .model-output {
+        font-size: 13px;
+        color: #333;
+        line-height: 1.4;
+      }
+
+      .model-output.empty {
+        color: #aaa;
+        font-style: italic;
+      }
+
+      .rating-wrap {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        width: 62px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        transition: border-color 0.2s;
+      }
+
+      .rating-wrap:focus-within {
+        border-color: #667eea;
+      }
+
+      .rating-wrap.invalid {
+        border-color: #e74c3c;
+        background: #fff5f5;
+      }
+
+      .rating-input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        outline: none;
+        background: transparent;
+        padding: 6px 2px 6px 8px;
+        font-size: 14px;
+        text-align: center;
+        color: #333;
+      }
+
+      .rating-arrow {
+        flex-shrink: 0;
+        width: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #888;
+        cursor: pointer;
+        user-select: none;
+        border-left: 1px solid #eee;
+      }
+
+      .rating-options {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        z-index: 40;
+        overflow: hidden;
+      }
+
+      .rating-wrap.open .rating-options {
+        display: block;
+      }
+
+      .rating-option {
+        padding: 6px 0;
+        text-align: center;
+        font-size: 13px;
+        cursor: pointer;
+        color: #333;
+      }
+
+      .rating-option:hover {
+        background: #667eea;
+        color: white;
       }
 
       /* ── Submit button ── */
@@ -666,11 +764,6 @@
             <button class="clip-step-btn next" id="nextClipBtn" title="Next clip (E)">
               &#9654;
             </button>
-            <span class="nav-divider"></span>
-            <span class="frame-nav-label">Frame:</span>
-            <button class="btn-frame" data-frame="1">1</button>
-            <button class="btn-frame" data-frame="21">21</button>
-            <button class="btn-frame" data-frame="41">41</button>
           </div>
         </div>
 
@@ -765,45 +858,27 @@
             </button>
           </div>
           <div class="activity-form">
-            <div>
-              <label for="activitySelect">Activity Label</label>
-              <select id="activitySelect">
-                <option value="" disabled selected>
-                  — Select an activity —
-                </option>
-                <optgroup label="Locomotion">
-                  <option value="walking">Walking</option>
-                  <option value="running">Running</option>
-                  <option value="standing">Standing</option>
-                  <option value="sitting">Sitting</option>
-                </optgroup>
-                <optgroup label="Social">
-                  <option value="talking">Talking / Conversing</option>
-                  <option value="greeting">Greeting</option>
-                  <option value="queuing">Queuing</option>
-                </optgroup>
-                <optgroup label="Object Interaction">
-                  <option value="using_phone">Using Phone</option>
-                  <option value="carrying">Carrying Object</option>
-                  <option value="pushing">Pushing / Pulling</option>
-                </optgroup>
-                <optgroup label="Other">
-                  <option value="unknown">Unknown / Unclear</option>
-                  <option value="other">Other</option>
-                </optgroup>
-              </select>
+            <div class="model-row-header">
+              <span>Model</span>
+              <span>Predicted activity</span>
+              <span>Rating</span>
+            </div>
+            <div class="model-predictions" id="modelPredictions">
+              <div class="no-predictions">Loading&#8230;</div>
             </div>
 
             <div>
-              <label for="notesInput">Notes (optional)</label>
+              <label for="customLabelInput"
+                >Your own label (if none of the above fit)</label
+              >
               <textarea
-                id="notesInput"
-                placeholder="Describe anything unusual or add context…"
+                id="customLabelInput"
+                placeholder="Describe the activity in your own words…"
               ></textarea>
             </div>
 
             <button class="submit-btn" id="submitBtn" disabled>
-              Submit Annotation
+              Submit Ratings
             </button>
           </div>
         </div>
@@ -819,9 +894,7 @@
           </div>
           <div class="stat-row">
             <span class="stat-key">Annotation frame</span>
-            <span class="stat-value" id="statAnnotationFrame"
-              >{{ frame_id | default(1) | int }}</span
-            >
+            <span class="stat-value" id="statAnnotationFrame">1</span>
           </div>
           <div class="stat-row">
             <span class="stat-key">Current preview frame</span>
@@ -840,22 +913,25 @@
             <span>Play / Pause</span><span class="shortcut-key">Space</span>
           </div>
           <div class="shortcut-row">
-            <span>Prev frame</span><span class="shortcut-key">&#8592; / A</span>
+            <span>Prev frame</span><span class="shortcut-key">&#8592;</span>
           </div>
           <div class="shortcut-row">
-            <span>Next frame</span><span class="shortcut-key">&#8594; / D</span>
+            <span>Next frame</span><span class="shortcut-key">&#8594;</span>
           </div>
           <div class="shortcut-row">
-            <span>Prev clip</span><span class="shortcut-key">Q</span>
+            <span>Prev clip</span><span class="shortcut-key">A</span>
           </div>
           <div class="shortcut-row">
-            <span>Next clip</span><span class="shortcut-key">E</span>
+            <span>Next clip</span><span class="shortcut-key">D</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Prev group</span><span class="shortcut-key">Q</span>
+          </div>
+          <div class="shortcut-row">
+            <span>Next group</span><span class="shortcut-key">E</span>
           </div>
           <div class="shortcut-row">
             <span>Jump to clip</span><span class="shortcut-key">Enter</span>
-          </div>
-          <div class="shortcut-row">
-            <span>Jump to frame 1 / 21 / 41</span><span class="shortcut-key">1 2 3</span>
           </div>
         </div>
       </div>
@@ -866,13 +942,12 @@
     <script>
       const CLIP_ID      = {{ clip_id     | default(1)  | int }};
       const TOTAL_CLIPS  = {{ total_clips | default(1)  | int }};
-      const FRAME_ID     = {{ frame_id    | default(1)  | int }};
       const NUM_FRAMES   = {{ num_frames  | default(50) | int }};
       const BASE_URL     = '/api/activity_annotation';
 
       // ── State ──────────────────────────────────────────────────────────────────
       let currentClipId  = CLIP_ID;
-      let currentFrameId = FRAME_ID;   // annotation frame (1, 21, or 41)
+      const currentFrameId = 1;        // annotation frame is fixed at 1 (21/41 unused)
       let currentFrame   = 0;          // 0-indexed preview frame
       let numFrames      = NUM_FRAMES;
       let isPlaying      = false;
@@ -892,13 +967,14 @@
       const globalLoading  = document.getElementById('globalLoading');
       const frameLoading   = document.getElementById('frameLoading');
       const clipInput      = document.getElementById('clipInput');
-      const activitySelect = document.getElementById('activitySelect');
       const submitBtn      = document.getElementById('submitBtn');
       const annotationWrapper = document.getElementById('annotationWrapper');
       const overlayCtx      = canvas.getContext('2d');
       const prevGroupBtn    = document.getElementById('prevGroupBtn');
       const nextGroupBtn    = document.getElementById('nextGroupBtn');
       const groupCounter    = document.getElementById('groupCounter');
+      const modelPredictionsEl = document.getElementById('modelPredictions');
+      const customLabelInput   = document.getElementById('customLabelInput');
 
       // ── Social-group box overlay state ────────────────────────────────────────
       let currentGroups     = [];
@@ -907,12 +983,8 @@
       let currentGroupIndex = -1;        // index into currentGroups of the highlighted group
       const groupAnnotationCache = {};   // clipId -> { frameStr: { groups, videoInfo, ... } }
 
-      const CONF_COLORS = {
-          1: '#2ECC71', 2: '#3498DB', 3: '#F1C40F', 4: '#E67E22', 5: '#E74C3C',
-      };
-      const CONF_FALLBACK = '#BB8FCE';
+      const SELECTED_COLOR = '#667eea';
       const DIM_COLOR = '#888888';
-      function confColor(confidence) { return CONF_COLORS[confidence] || CONF_FALLBACK; }
 
       // ── Fetch group boxes for a clip (cached). Bbox source: deepseek-vl2 ─────────
       async function fetchGroupAnnotations(clipId) {
@@ -922,6 +994,189 @@
           groupAnnotationCache[clipId] = data.success ? data.frames : {};
           return groupAnnotationCache[clipId];
       }
+
+      // ── Model predictions (group_activity per model, per group) ──────────────────
+      const MODEL_DISPLAY_NAMES = {
+          'deepseek-vl2':               'DeepSeek-VL2',
+          'gemini':                     'Gemini',
+          'llava-v1.6-mistral-7b-hf':   'LLaVA-1.6-Mistral-7B',
+          'Qwen2.5-VL-72B-Instruct':    'Qwen2.5-VL-72B',
+          'Qwen2.5-VL-7B-Instruct':     'Qwen2.5-VL-7B',
+          'Qwen3-VL-30B-A3B-Instruct':  'Qwen3-VL-30B-A3B',
+      };
+      let MODEL_ORDER = Object.keys(MODEL_DISPLAY_NAMES);
+      let currentPredictions = {};        // groupId (string) -> { modelName: [activities] }
+      const predictionsCache = {};        // "clipId_frameId" -> predictions
+
+      // Unsaved rating drafts, kept in memory so switching groups (or clips/frames)
+      // without submitting doesn't lose what was already typed.
+      const ratingDrafts = {};            // "clipId_frameId_groupId" -> { ratings: {model: value}, customLabel }
+
+      function draftKey(clipId, frameId, groupId) {
+          return `${clipId}_${frameId}_${groupId}`;
+      }
+
+      function saveDraft() {
+          if (currentGroupIndex < 0) return;
+          const group = currentGroups[currentGroupIndex];
+          if (!group) return;
+          const ratings = {};
+          modelPredictionsEl.querySelectorAll('.rating-input').forEach(inp => {
+              ratings[inp.dataset.model] = inp.value;
+          });
+          ratingDrafts[draftKey(currentClipId, currentFrameId, group.groupId)] = {
+              ratings,
+              customLabel: customLabelInput.value,
+          };
+      }
+
+      async function fetchPredictions(clipId, frameId) {
+          const key = `${clipId}_${frameId}`;
+          if (predictionsCache[key]) return predictionsCache[key];
+          const resp = await fetch(`/api/activity_annotation/predictions/${clipId}/${frameId}`);
+          const data = await resp.json();
+          if (data.success && Array.isArray(data.models) && data.models.length) {
+              MODEL_ORDER = data.models;
+          }
+          predictionsCache[key] = data.success ? data.predictions : {};
+          return predictionsCache[key];
+      }
+
+      // Render the 6 model rows for whichever group is currently selected.
+      function renderModelPredictions(groupId) {
+          if (groupId == null) {
+              customLabelInput.value = '';
+              modelPredictionsEl.innerHTML = '<div class="no-predictions">No group selected.</div>';
+              updateSubmitEnabled();
+              return;
+          }
+
+          const draft = ratingDrafts[draftKey(currentClipId, currentFrameId, groupId)] || { ratings: {}, customLabel: '' };
+          customLabelInput.value = draft.customLabel || '';
+
+          const groupPredictions = currentPredictions[String(groupId)] || {};
+
+          modelPredictionsEl.innerHTML = MODEL_ORDER.map(modelName => {
+              const activities = groupPredictions[modelName] || [];
+              const outputText = activities.length ? activities.join(', ') : 'no activity detected';
+              const emptyClass = activities.length ? '' : ' empty';
+              const savedValue = draft.ratings[modelName] || '';
+              return `
+                  <div class="model-row" data-model="${modelName}">
+                      <div class="model-name">${MODEL_DISPLAY_NAMES[modelName] || modelName}</div>
+                      <div class="model-output${emptyClass}">${outputText}</div>
+                      <div class="rating-wrap">
+                          <input type="text" inputmode="numeric" autocomplete="off" maxlength="1"
+                                 class="rating-input" placeholder="—" data-model="${modelName}" value="${savedValue}">
+                          <span class="rating-arrow">&#9662;</span>
+                          <div class="rating-options">
+                              <div class="rating-option" data-value="1">1</div>
+                              <div class="rating-option" data-value="2">2</div>
+                              <div class="rating-option" data-value="3">3</div>
+                              <div class="rating-option" data-value="4">4</div>
+                              <div class="rating-option" data-value="5">5</div>
+                          </div>
+                      </div>
+                  </div>`;
+          }).join('');
+
+          modelPredictionsEl.querySelectorAll('.rating-input').forEach(inp => validateRatingInput(inp));
+          updateSubmitEnabled();
+      }
+
+      function updateSubmitEnabled() {
+          const anyRating = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'))
+              .some(inp => inp.value.trim() !== '');
+          const hasCustomLabel = customLabelInput.value.trim() !== '';
+          submitBtn.disabled = !(anyRating || hasCustomLabel);
+      }
+
+      // Only 1-5 is a valid rating; anything else gets a red border + a native warning bubble.
+      function validateRatingInput(input, { showWarning = false } = {}) {
+          const val = input.value.trim();
+          const isValid = val === '' || /^[1-5]$/.test(val);
+          input.closest('.rating-wrap').classList.toggle('invalid', !isValid);
+          input.setCustomValidity(isValid ? '' : 'Enter a number from 1 to 5');
+          if (showWarning && !isValid) input.reportValidity();
+          return isValid;
+      }
+
+      function sanitizeRatingInput(input) {
+          const cleaned = input.value.replace(/[^0-9]/g, '');
+          if (cleaned !== input.value) input.value = cleaned;
+      }
+
+      // ── Custom rating dropdown (always shows all 1-5 options, every time) ────────
+      function openRatingDropdown(wrap) {
+          document.querySelectorAll('.rating-wrap.open').forEach(w => { if (w !== wrap) w.classList.remove('open'); });
+          wrap.classList.add('open');
+      }
+      function closeRatingDropdown(wrap) {
+          wrap.classList.remove('open');
+      }
+
+      modelPredictionsEl.addEventListener('focusin', (e) => {
+          if (e.target.classList.contains('rating-input')) {
+              openRatingDropdown(e.target.closest('.rating-wrap'));
+          }
+      });
+
+      modelPredictionsEl.addEventListener('click', (e) => {
+          const arrow = e.target.closest('.rating-arrow');
+          if (arrow) {
+              const wrap = arrow.closest('.rating-wrap');
+              if (wrap.classList.contains('open')) {
+                  closeRatingDropdown(wrap);
+              } else {
+                  wrap.querySelector('.rating-input').focus();
+                  openRatingDropdown(wrap);
+              }
+              return;
+          }
+          const option = e.target.closest('.rating-option');
+          if (option) {
+              const wrap = option.closest('.rating-wrap');
+              const input = wrap.querySelector('.rating-input');
+              input.value = option.dataset.value;
+              validateRatingInput(input);
+              updateSubmitEnabled();
+              saveDraft();
+              input.focus();
+              closeRatingDropdown(wrap);
+          }
+      });
+
+      document.addEventListener('click', (e) => {
+          document.querySelectorAll('.rating-wrap.open').forEach(wrap => {
+              if (!wrap.contains(e.target)) closeRatingDropdown(wrap);
+          });
+      });
+
+      modelPredictionsEl.addEventListener('input', (e) => {
+          if (!e.target.classList.contains('rating-input')) return;
+          sanitizeRatingInput(e.target);
+          validateRatingInput(e.target);
+          updateSubmitEnabled();
+          saveDraft();
+      });
+
+      // Enter moves to the next model's rating box; stays put on the last one.
+      modelPredictionsEl.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || !e.target.classList.contains('rating-input')) return;
+          e.preventDefault();
+          if (!validateRatingInput(e.target, { showWarning: true })) return;
+          const inputs = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'));
+          const idx = inputs.indexOf(e.target);
+          if (idx >= 0 && idx < inputs.length - 1) {
+              inputs[idx + 1].focus();
+              inputs[idx + 1].select();
+          }
+      });
+
+      customLabelInput.addEventListener('input', () => {
+          updateSubmitEnabled();
+          saveDraft();
+      });
 
       // ── Draw social-group boxes on the overlay canvas ─────────────────────────────
       // highlightIdx selects the group currently being rated: it's drawn at full
@@ -947,7 +1202,7 @@
               const sh = (y2 - y1) * scaleY;
 
               const isSelected = !hasHighlight || i === highlightIdx;
-              const color      = isSelected ? confColor(g.confidence) : DIM_COLOR;
+              const color      = isSelected ? SELECTED_COLOR : DIM_COLOR;
               const lineWidth  = isSelected ? (hasHighlight ? 4 : 3) : 2;
 
               overlayCtx.save();
@@ -960,7 +1215,7 @@
               overlayCtx.lineWidth = lineWidth;
               overlayCtx.strokeRect(sx, sy, sw, sh);
 
-              const label = `G${g.groupId != null ? g.groupId : i}  conf:${g.confidence}`;
+              const label = `Group ${g.groupId != null ? g.groupId : i}`;
               overlayCtx.font = 'bold 14px Segoe UI, sans-serif';
               const tm = overlayCtx.measureText(label);
               const lh = 22;
@@ -975,7 +1230,7 @@
           });
       }
 
-      // ── Group nav (Prev/Next within the current frame's groups) ──────────────────
+      // ── Group nav (Prev/Next within the current frame's groups, loops at the ends) ──
       function updateGroupNavUI() {
           if (currentGroups.length === 0) {
               groupCounter.textContent = 'No groups on this frame';
@@ -983,8 +1238,8 @@
               nextGroupBtn.disabled = true;
           } else {
               groupCounter.textContent = `Group ${currentGroupIndex + 1} / ${currentGroups.length}`;
-              prevGroupBtn.disabled = currentGroupIndex <= 0;
-              nextGroupBtn.disabled = currentGroupIndex >= currentGroups.length - 1;
+              prevGroupBtn.disabled = false;
+              nextGroupBtn.disabled = false;
           }
       }
 
@@ -992,6 +1247,15 @@
           currentGroupIndex = index;
           updateGroupNavUI();
           drawGroupBoxes(currentGroups, currentImgW, currentImgH, currentGroupIndex);
+          const group = currentGroups[currentGroupIndex];
+          renderModelPredictions(group ? group.groupId : null);
+      }
+
+      // Steps to the next/prev group, wrapping around at either end.
+      function stepGroup(delta) {
+          if (currentGroups.length === 0) return;
+          const next = (currentGroupIndex + delta + currentGroups.length) % currentGroups.length;
+          selectGroup(next);
       }
 
       // Click a box on the annotated frame to make it the active group.
@@ -1015,18 +1279,6 @@
       canvas.addEventListener('click', (e) => {
           const idx = hitTestGroup(e.clientX, e.clientY);
           if (idx >= 0) selectGroup(idx);
-      });
-
-      // ── Frame nav (1 / 21 / 41 buttons in Navigate Clips panel) ──────────────────
-      function updateFrameButtons() {
-          document.querySelectorAll('.btn-frame').forEach(btn => {
-              btn.classList.toggle('active', parseInt(btn.dataset.frame, 10) === currentFrameId);
-          });
-      }
-
-      // Enable submit once an activity is chosen
-      activitySelect.addEventListener('change', () => {
-          submitBtn.disabled = !activitySelect.value;
       });
 
       // ── Frame preload cache ─────────────────────────────────────────────────────
@@ -1089,15 +1341,12 @@
           const wasPlaying = isPlaying;
           stopAnimation();
           globalLoading.classList.remove('hidden');
-          updateFrameButtons();
 
           // Clear preload cache
           for (const k of Object.keys(preloadCache)) delete preloadCache[k];
 
           // Reset annotation form
-          activitySelect.value = '';
           submitBtn.disabled = true;
-          document.getElementById('notesInput').value = '';
           overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
           currentGroupIndex = -1;
           updateGroupNavUI();
@@ -1115,6 +1364,11 @@
               currentGroupIndex = currentGroups.length > 0 ? 0 : -1;
               updateGroupNavUI();
               drawGroupBoxes(currentGroups, currentImgW, currentImgH, currentGroupIndex);
+
+              // Fetch each model's predicted activity for every group in this frame
+              currentPredictions = await fetchPredictions(clipId, currentFrameId);
+              const selectedGroup = currentGroupIndex >= 0 ? currentGroups[currentGroupIndex] : null;
+              renderModelPredictions(selectedGroup ? selectedGroup.groupId : null);
 
               // Update info
               document.getElementById('headerClip').textContent    = clipId;
@@ -1193,44 +1447,35 @@
           if (e.key === 'Enter') document.getElementById('goClipBtn').click();
       });
 
-      document.querySelectorAll('.btn-frame').forEach(btn => {
-          btn.addEventListener('click', () => {
-              changeFrame(parseInt(btn.dataset.frame, 10));
-          });
-      });
-
-      prevGroupBtn.addEventListener('click', () => {
-          if (currentGroupIndex > 0) selectGroup(currentGroupIndex - 1);
-      });
-      nextGroupBtn.addEventListener('click', () => {
-          if (currentGroupIndex < currentGroups.length - 1) selectGroup(currentGroupIndex + 1);
-      });
+      prevGroupBtn.addEventListener('click', () => stepGroup(-1));
+      nextGroupBtn.addEventListener('click', () => stepGroup(1));
 
       document.addEventListener('keydown', e => {
           const tag = e.target.tagName;
           if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
           switch (e.key) {
               case ' ':          playBtn.click(); e.preventDefault(); break;
-              case 'ArrowLeft':
-              case 'a':          navigateTo(currentFrame - 1); e.preventDefault(); break;
-              case 'ArrowRight':
-              case 'd':          navigateTo(currentFrame + 1); e.preventDefault(); break;
-              case 'q': case 'Q': if (currentClipId > 1)           loadNewClip(currentClipId - 1); break;
-              case 'e': case 'E': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
-              case '1':          changeFrame(1);  e.preventDefault(); break;
-              case '2':          changeFrame(21); e.preventDefault(); break;
-              case '3':          changeFrame(41); e.preventDefault(); break;
+              case 'ArrowLeft':  navigateTo(currentFrame - 1); e.preventDefault(); break;
+              case 'ArrowRight': navigateTo(currentFrame + 1); e.preventDefault(); break;
+              case 'a': case 'A': if (currentClipId > 1)           loadNewClip(currentClipId - 1); break;
+              case 'd': case 'D': if (currentClipId < TOTAL_CLIPS) loadNewClip(currentClipId + 1); break;
+              case 'q': case 'Q': stepGroup(-1); e.preventDefault(); break;
+              case 'e': case 'E': stepGroup(1);  e.preventDefault(); break;
           }
       });
 
       // ── Submit ───────────────────────────────────────────────────────────────────
       submitBtn.addEventListener('click', async () => {
+          const ratings = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'))
+              .filter(inp => inp.value.trim() !== '')
+              .map(inp => ({ model: inp.dataset.model, rating: parseInt(inp.value, 10) }));
+
           const payload = {
-              clipId:           currentClipId,
-              frameId:          currentFrameId,
-              groupId:          currentGroupIndex >= 0 ? currentGroups[currentGroupIndex].groupId : null,
-              activityLabel:    activitySelect.value,
-              notes:            document.getElementById('notesInput').value.trim(),
+              clipId:       currentClipId,
+              frameId:      currentFrameId,
+              groupId:      currentGroupIndex >= 0 ? currentGroups[currentGroupIndex].groupId : null,
+              ratings:      ratings,
+              customLabel:  customLabelInput.value.trim(),
           };
 
           try {
@@ -1262,16 +1507,8 @@
 
       function loadNewClip(clipId) {
           currentClipId  = clipId;
-          currentFrameId = 1;   // always start a new clip at frame 1
           history.pushState({}, '', `/activity_annotation/${clipId}/${currentFrameId}`);
           loadClip(clipId);
-      }
-
-      function changeFrame(frameId) {
-          if (frameId === currentFrameId) return;
-          currentFrameId = frameId;
-          history.pushState({}, '', `/activity_annotation/${currentClipId}/${currentFrameId}`);
-          loadClip(currentClipId);
       }
 
       // ── Init ─────────────────────────────────────────────────────────────────────
