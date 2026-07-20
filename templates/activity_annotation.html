@@ -1472,6 +1472,7 @@
 
           const payload = {
               clipId:       currentClipId,
+              videoFolder:  `clip_${String(currentClipId).padStart(4, '0')}`,
               frameId:      currentFrameId,
               groupId:      currentGroupIndex >= 0 ? currentGroups[currentGroupIndex].groupId : null,
               ratings:      ratings,
@@ -1492,7 +1493,7 @@
               if (json.success) {
                   submitBtn.textContent = '✅ Saved!';
                   setTimeout(() => {
-                      submitBtn.textContent = 'Submit Annotation';
+                      submitBtn.textContent = 'Submit Ratings';
                       submitBtn.disabled = false;
                   }, 1500);
               } else {

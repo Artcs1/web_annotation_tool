@@ -127,6 +127,7 @@ class VideoAnnotationApp:
             self.annotations_collection = self.db['annotations']
             self.yes_no_annotations_collection = self.db['yes_no_annotations']
             self.finegrained_annotations_collection = self.db['finegrained_annotations']
+            self.activity_annotations_collection = self.db['activity_annotations']
             print(f"✅ Connected to MongoDB: {self.MONGO_DB}")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
@@ -1332,6 +1333,33 @@ class VideoAnnotationApp:
                 'models': self.MODEL_NAMES,
                 'predictions': predictions,
             })
+
+        @self.app.route('/api/activity_annotation/save-annotation', methods=['POST'])
+        def activity_annotation_save_annotation():
+            """Save one group's model-rating ratings + optional custom label to MongoDB"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+
+            try:
+                data = request.json
+                data['annotator_id'] = session.get('annotator_id', 'unknown')
+                data['created_at']   = datetime.utcnow()
+                data['updated_at']   = datetime.utcnow()
+
+                result = self.activity_annotations_collection.insert_one(data)
+
+                print(f"✅ Activity annotation saved with ID: {result.inserted_id}")
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Activity annotation saved to MongoDB',
+                    'annotation_id': str(result.inserted_id)
+                })
+            except Exception as e:
+                print(f"❌ Error saving activity annotation: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'success': False, 'error': str(e)}), 500
 
 
 
