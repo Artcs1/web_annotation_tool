@@ -473,6 +473,12 @@
         min-height: 80px;
       }
 
+      .activity-form textarea:disabled {
+        background: #f2f2f2;
+        color: #999;
+        cursor: not-allowed;
+      }
+
       /* ── Model prediction rows ── */
       .model-row-header {
         display: grid;
@@ -550,6 +556,11 @@
         background: #fff5f5;
       }
 
+      .rating-wrap.disabled {
+        background: #f2f2f2;
+        border-color: #e5e5e5;
+      }
+
       .rating-input {
         flex: 1;
         min-width: 0;
@@ -560,6 +571,11 @@
         font-size: 14px;
         text-align: center;
         color: #333;
+      }
+
+      .rating-input:disabled {
+        color: #bbb;
+        cursor: not-allowed;
       }
 
       .rating-arrow {
@@ -573,6 +589,11 @@
         cursor: pointer;
         user-select: none;
         border-left: 1px solid #eee;
+      }
+
+      .rating-wrap.disabled .rating-arrow {
+        cursor: not-allowed;
+        color: #ccc;
       }
 
       .rating-options {
@@ -878,7 +899,7 @@
             </div>
 
             <button class="submit-btn" id="submitBtn" disabled>
-              Submit Ratings
+              Complete rating all groups to submit
             </button>
           </div>
         </div>
@@ -983,6 +1004,11 @@
       let currentGroupIndex = -1;        // index into currentGroups of the highlighted group
       const groupAnnotationCache = {};   // clipId -> { frameStr: { groups, videoInfo, ... } }
 
+      // Whether the current annotator already submitted ratings for every group
+      // on the current clip/frame — once true, all rating inputs, the custom
+      // label box, and the submit button stay locked (no resubmission).
+      let frameSubmitted = false;
+
       const SELECTED_COLOR = '#667eea';
       const DIM_COLOR = '#888888';
 
@@ -998,7 +1024,6 @@
       // ── Model predictions (group_activity per model, per group) ──────────────────
       const MODEL_DISPLAY_NAMES = {
           'deepseek-vl2':               'DeepSeek-VL2',
-          'gemini':                     'Gemini',
           'llava-v1.6-mistral-7b-hf':   'LLaVA-1.6-Mistral-7B',
           'Qwen2.5-VL-72B-Instruct':    'Qwen2.5-VL-72B',
           'Qwen2.5-VL-7B-Instruct':     'Qwen2.5-VL-7B',
@@ -1042,8 +1067,23 @@
           return predictionsCache[key];
       }
 
+      // Ask the server whether this annotator already submitted ratings for
+      // every group on this clip/frame (persists across reloads/revisits).
+      async function fetchSubmissionStatus(clipId, frameId) {
+          try {
+              const resp = await fetch(`${BASE_URL}/submission-status/${clipId}/${frameId}`);
+              const data = await resp.json();
+              return data.success ? !!data.submitted : false;
+          } catch (err) {
+              console.error('Submission status check failed:', err);
+              return false;
+          }
+      }
+
       // Render the 6 model rows for whichever group is currently selected.
       function renderModelPredictions(groupId) {
+          customLabelInput.disabled = frameSubmitted;
+
           if (groupId == null) {
               customLabelInput.value = '';
               modelPredictionsEl.innerHTML = '<div class="no-predictions">No group selected.</div>';
@@ -1058,16 +1098,22 @@
 
           modelPredictionsEl.innerHTML = MODEL_ORDER.map(modelName => {
               const activities = groupPredictions[modelName] || [];
-              const outputText = activities.length ? activities.join(', ') : 'no activity detected';
-              const emptyClass = activities.length ? '' : ' empty';
-              const savedValue = draft.ratings[modelName] || '';
+              const isNA = activities.length === 0;
+              // N/A means the model produced no prediction — rating it is meaningless.
+              // Once the frame is already submitted, every input locks the same way.
+              const isLocked = isNA || frameSubmitted;
+              const outputText = isNA ? 'N/A' : activities.join(', ');
+              const emptyClass = isNA ? ' empty' : '';
+              const savedValue = isNA ? '' : (draft.ratings[modelName] || '');
+              const lockTitle = isNA ? 'No predicted activity to rate' : 'Already submitted for this frame';
               return `
                   <div class="model-row" data-model="${modelName}">
                       <div class="model-name">${MODEL_DISPLAY_NAMES[modelName] || modelName}</div>
                       <div class="model-output${emptyClass}">${outputText}</div>
-                      <div class="rating-wrap">
+                      <div class="rating-wrap${isLocked ? ' disabled' : ''}">
                           <input type="text" inputmode="numeric" autocomplete="off" maxlength="1"
-                                 class="rating-input" placeholder="—" data-model="${modelName}" value="${savedValue}">
+                                 class="rating-input" placeholder="${isNA ? 'N/A' : '—'}" data-model="${modelName}"
+                                 value="${savedValue}" ${isLocked ? `disabled title="${lockTitle}"` : ''}>
                           <span class="rating-arrow">&#9662;</span>
                           <div class="rating-options">
                               <div class="rating-option" data-value="1">1</div>
@@ -1084,11 +1130,41 @@
           updateSubmitEnabled();
       }
 
+      // Models with no predicted activity (N/A) are excluded — their input is
+      // disabled and can never be rated.
+      function ratableModelsForGroup(groupId) {
+          const groupPredictions = currentPredictions[String(groupId)] || {};
+          return MODEL_ORDER.filter(modelName => (groupPredictions[modelName] || []).length > 0);
+      }
+
+      // A group counts as "rated" once every one of its non-N/A models has a
+      // valid 1-5 rating. Custom label is optional and never substitutes for a
+      // missing model rating. A group with no ratable models (all N/A) is
+      // vacuously complete since there is nothing to rate.
+      function isGroupRated(groupId) {
+          const ratable = ratableModelsForGroup(groupId);
+          if (ratable.length === 0) return true;
+          const draft = ratingDrafts[draftKey(currentClipId, currentFrameId, groupId)];
+          const ratings = draft ? (draft.ratings || {}) : {};
+          return ratable.every(modelName => /^[1-5]$/.test((ratings[modelName] || '').toString().trim()));
+      }
+
+      function allGroupsRated() {
+          return currentGroups.length > 0 && currentGroups.every(g => isGroupRated(g.groupId));
+      }
+
+      // Submission is blocked until every group on the frame has a rating for
+      // every one of its non-N/A models — no more submitting group-by-group.
+      // Once the frame has already been submitted, it stays locked permanently.
       function updateSubmitEnabled() {
-          const anyRating = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'))
-              .some(inp => inp.value.trim() !== '');
-          const hasCustomLabel = customLabelInput.value.trim() !== '';
-          submitBtn.disabled = !(anyRating || hasCustomLabel);
+          if (frameSubmitted) {
+              submitBtn.disabled = true;
+              submitBtn.textContent = '✅ Ratings already submitted for this frame';
+              return;
+          }
+          const ready = allGroupsRated();
+          submitBtn.disabled = !ready;
+          submitBtn.textContent = ready ? 'Submit Ratings' : 'Complete rating all groups to submit';
       }
 
       // Only 1-5 is a valid rating; anything else gets a red border + a native warning bubble.
@@ -1125,6 +1201,7 @@
           const arrow = e.target.closest('.rating-arrow');
           if (arrow) {
               const wrap = arrow.closest('.rating-wrap');
+              if (wrap.classList.contains('disabled')) return;
               if (wrap.classList.contains('open')) {
                   closeRatingDropdown(wrap);
               } else {
@@ -1139,8 +1216,8 @@
               const input = wrap.querySelector('.rating-input');
               input.value = option.dataset.value;
               validateRatingInput(input);
-              updateSubmitEnabled();
               saveDraft();
+              updateSubmitEnabled();
               input.focus();
               closeRatingDropdown(wrap);
           }
@@ -1156,8 +1233,8 @@
           if (!e.target.classList.contains('rating-input')) return;
           sanitizeRatingInput(e.target);
           validateRatingInput(e.target);
-          updateSubmitEnabled();
           saveDraft();
+          updateSubmitEnabled();
       });
 
       // Enter moves to the next model's rating box; stays put on the last one.
@@ -1174,8 +1251,8 @@
       });
 
       customLabelInput.addEventListener('input', () => {
-          updateSubmitEnabled();
           saveDraft();
+          updateSubmitEnabled();
       });
 
       // ── Draw social-group boxes on the overlay canvas ─────────────────────────────
@@ -1346,7 +1423,10 @@
           for (const k of Object.keys(preloadCache)) delete preloadCache[k];
 
           // Reset annotation form
+          frameSubmitted = false;
           submitBtn.disabled = true;
+          submitBtn.textContent = 'Complete rating all groups to submit';
+          customLabelInput.disabled = false;
           overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
           currentGroupIndex = -1;
           updateGroupNavUI();
@@ -1367,6 +1447,11 @@
 
               // Fetch each model's predicted activity for every group in this frame
               currentPredictions = await fetchPredictions(clipId, currentFrameId);
+
+              // Check (before rendering) whether this annotator already submitted
+              // this frame, so the very first render comes up locked if so.
+              frameSubmitted = await fetchSubmissionStatus(clipId, currentFrameId);
+
               const selectedGroup = currentGroupIndex >= 0 ? currentGroups[currentGroupIndex] : null;
               renderModelPredictions(selectedGroup ? selectedGroup.groupId : null);
 
@@ -1464,41 +1549,51 @@
           }
       });
 
-      // ── Submit ───────────────────────────────────────────────────────────────────
+      // ── Submit (whole frame at once — every group must be rated first) ──────────
       submitBtn.addEventListener('click', async () => {
-          const ratings = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'))
-              .filter(inp => inp.value.trim() !== '')
-              .map(inp => ({ model: inp.dataset.model, rating: parseInt(inp.value, 10) }));
+          saveDraft();
+          if (!allGroupsRated()) { updateSubmitEnabled(); return; }
 
-          const payload = {
-              clipId:       currentClipId,
-              videoFolder:  `clip_${String(currentClipId).padStart(4, '0')}`,
-              frameId:      currentFrameId,
-              groupId:      currentGroupIndex >= 0 ? currentGroups[currentGroupIndex].groupId : null,
-              ratings:      ratings,
-              customLabel:  customLabelInput.value.trim(),
-          };
+          // One payload per group, each carrying its own bbox alongside the
+          // existing fields — this replaces the old "submit the active group
+          // only" flow with a single batched submission for the whole frame.
+          const groupPayloads = currentGroups.map(group => {
+              const draft = ratingDrafts[draftKey(currentClipId, currentFrameId, group.groupId)] || { ratings: {}, customLabel: '' };
+              const ratings = Object.entries(draft.ratings || {})
+                  .filter(([, value]) => (value || '').toString().trim() !== '')
+                  .map(([model, value]) => ({ model, rating: parseInt(value, 10) }));
+
+              return {
+                  clipId:       currentClipId,
+                  videoFolder:  `clip_${String(currentClipId).padStart(4, '0')}`,
+                  frameId:      currentFrameId,
+                  groupId:      group.groupId,
+                  bbox:         group.bbox,
+                  ratings:      ratings,
+                  customLabel:  (draft.customLabel || '').trim(),
+              };
+          });
 
           try {
               submitBtn.disabled = true;
               submitBtn.textContent = 'Saving…';
 
-              const resp = await fetch(`${BASE_URL}/save-annotation`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(payload),
-              });
+              const results = await Promise.all(groupPayloads.map(payload =>
+                  fetch(`${BASE_URL}/save-annotation`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload),
+                  }).then(resp => resp.json())
+              ));
 
-              const json = await resp.json();
-              if (json.success) {
-                  submitBtn.textContent = '✅ Saved!';
-                  setTimeout(() => {
-                      submitBtn.textContent = 'Submit Ratings';
-                      submitBtn.disabled = false;
-                  }, 1500);
-              } else {
-                  throw new Error(json.error || 'Unknown error');
-              }
+              const failed = results.find(r => !r.success);
+              if (failed) throw new Error(failed.error || 'Unknown error');
+
+              // Lock the frame for good — no resubmission. Re-render the active
+              // group so its inputs pick up the disabled state immediately.
+              frameSubmitted = true;
+              const selectedGroup = currentGroupIndex >= 0 ? currentGroups[currentGroupIndex] : null;
+              renderModelPredictions(selectedGroup ? selectedGroup.groupId : null);
           } catch (err) {
               submitBtn.textContent = '❌ Error — retry?';
               submitBtn.disabled = false;
@@ -1515,6 +1610,10 @@
       // ── Init ─────────────────────────────────────────────────────────────────────
       (async () => {
           fps = parseInt(speedSelect.value, 10);
+          // Establish this browser's persistent annotator id (session cookie) up
+          // front — the submission-lock check is keyed off it, same as every
+          // other annotation page in this app.
+          await fetch('/api/get-annotator-id');
           await loadClip(CLIP_ID);
           for (let i = 1; i < Math.min(5, numFrames); i++) {
               preloadFrame(currentClipId, i);

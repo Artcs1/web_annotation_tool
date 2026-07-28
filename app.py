@@ -49,7 +49,7 @@ class VideoAnnotationApp:
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
         self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" /  "tracking_annotations.json"
         self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3_v1.json"
-        self.CULTURAL_GROUPS_FILE = self.BASE_DIR / "results_cultural_540" / "results_cultural_540" / "deepseek-vl2" / "annotations.json"
+        self.CULTURAL_GROUPS_FILE = self.BASE_DIR / "results_cultural" / "deepseek-vl2" / "annotations_ca.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
@@ -73,18 +73,21 @@ class VideoAnnotationApp:
         if self.CULTURAL_GROUPS_FILE.exists():
             with open(self.CULTURAL_GROUPS_FILE, 'r', encoding='utf-8') as f:
                 self.CULTURAL_GROUPS = json.load(f)
-            print(f"[INFO] Loaded cultural group boxes (deepseek-vl2): {len(self.CULTURAL_GROUPS.get('annotations', []))} entries")
+            print(f"[INFO] Loaded cultural group boxes (deepseek-vl2, ca): {len(self.CULTURAL_GROUPS.get('annotations', []))} entries")
         else:
             self.CULTURAL_GROUPS = {'annotations': []}
-            print("[WARN] Cultural group boxes file (deepseek-vl2) not found")
+            print("[WARN] Cultural group boxes file (deepseek-vl2, ca) not found")
 
-        # Pseudo activity-label predictions from all 6 VLMs, keyed down to just
-        # (videoIndex, annotationFrame) -> groupId -> group_activity, since the raw
-        # per-model files also carry verbose LLM call logs (group_activity_LMhist,
+        # Pseudo activity-label predictions from all 5 VLMs, keyed down to just
+        # (videoIndex, annotationFrame) -> groupId -> group_activity_dedup, since the
+        # raw per-model files also carry verbose LLM call logs (group_activity_LMhist,
         # etc.) that aren't needed here and would otherwise stay resident in memory.
+        # group_activity_dedup (from the "_ca" = canonicalized-activity files) is used
+        # instead of the raw group_activity so near-duplicate free-text phrasings
+        # (e.g. "shopping"/"shop") are already merged before display. deepseek-vl2's
+        # pipeline errored out for this dataset, so its predictions are empty lists.
         self.MODEL_NAMES = [
             'deepseek-vl2',
-            'gemini',
             'llava-v1.6-mistral-7b-hf',
             'Qwen2.5-VL-72B-Instruct',
             'Qwen2.5-VL-7B-Instruct',
@@ -92,7 +95,7 @@ class VideoAnnotationApp:
         ]
         self.MODEL_GROUP_ACTIVITY = {}
         for model_name in self.MODEL_NAMES:
-            model_file = self.BASE_DIR / "results_cultural_540" / "results_cultural_540" / model_name / "annotations.json"
+            model_file = self.BASE_DIR / "results_cultural" / model_name / "annotations_ca.json"
             if not model_file.exists():
                 print(f"[WARN] Cultural annotations not found for model: {model_name}")
                 continue
@@ -102,12 +105,12 @@ class VideoAnnotationApp:
             for ann in raw.get('annotations', []):
                 key = (ann['videoIndex'], ann['videoInfo']['annotationFrame'])
                 compact[key] = {
-                    g.get('groupId'): (g.get('cultural_output') or {}).get('group_activity', [])
+                    g.get('groupId'): (g.get('cultural_output') or {}).get('group_activity_dedup') or []
                     for g in ann.get('groups', [])
                 }
             self.MODEL_GROUP_ACTIVITY[model_name] = compact
             del raw
-            print(f"[INFO] Loaded group_activity predictions for model: {model_name} ({len(compact)} clip-frame entries)")
+            print(f"[INFO] Loaded group_activity_dedup predictions for model: {model_name} ({len(compact)} clip-frame entries)")
 
         def load_detections_cache():
             if self.DETECTIONS_CACHE_FILE.exists():
@@ -1293,7 +1296,7 @@ class VideoAnnotationApp:
         def activity_annotation_groups(clip_id):
             """Return group bboxes for all 3 annotated frames of a clip.
 
-            Bbox source is the deepseek-vl2 pseudo-label file, since all 6 models
+            Bbox source is the deepseek-vl2 pseudo-label file, since all 5 models
             share identical bbox/groupId values for a given clip+frame. Confidence
             is intentionally omitted here — it's a per-activity-label score from the
             annotation pipeline, not a group-detection confidence, so it doesn't
@@ -1319,7 +1322,7 @@ class VideoAnnotationApp:
 
         @self.app.route('/api/activity_annotation/predictions/<int:clip_id>/<int:frame_id>')
         def activity_annotation_predictions(clip_id, frame_id):
-            """Return each of the 6 models' predicted group_activity, keyed by groupId"""
+            """Return each of the 5 models' predicted group_activity_dedup, keyed by groupId"""
             key = (clip_id, frame_id)
             predictions = {}
             for model_name in self.MODEL_NAMES:
@@ -1333,6 +1336,37 @@ class VideoAnnotationApp:
                 'models': self.MODEL_NAMES,
                 'predictions': predictions,
             })
+
+        @self.app.route('/api/activity_annotation/submission-status/<int:clip_id>/<int:frame_id>')
+        def activity_annotation_submission_status(clip_id, frame_id):
+            """Whether the current annotator already submitted ratings for every
+            group on this clip/frame. Submission is all-or-nothing per frame, so
+            this is what the frontend uses to permanently lock a frame instead of
+            allowing resubmission."""
+            if self.db is None:
+                return jsonify({'success': True, 'submitted': False})
+
+            annotator_id = session.get('annotator_id')
+            if not annotator_id:
+                return jsonify({'success': True, 'submitted': False})
+
+            num_groups = 0
+            for ann in self.CULTURAL_GROUPS.get('annotations', []):
+                if ann['videoIndex'] == clip_id and ann['videoInfo']['annotationFrame'] == frame_id:
+                    num_groups = ann.get('numberOfGroups', 0)
+                    break
+
+            if num_groups == 0:
+                return jsonify({'success': True, 'submitted': False})
+
+            video_folder = f"clip_{clip_id:04d}"
+            submitted_group_ids = self.activity_annotations_collection.distinct('groupId', {
+                'annotator_id': annotator_id,
+                'videoFolder': video_folder,
+                'frameId': frame_id,
+            })
+
+            return jsonify({'success': True, 'submitted': len(submitted_group_ids) >= num_groups})
 
         @self.app.route('/api/activity_annotation/save-annotation', methods=['POST'])
         def activity_annotation_save_annotation():

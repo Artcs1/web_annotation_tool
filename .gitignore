@@ -6,6 +6,7 @@ env/
 
 # Data
 /videos
+/results_cultural
 /results_cultural_540
 
 # Python bytecode
