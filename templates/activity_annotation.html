@@ -327,6 +327,38 @@
         flex-wrap: wrap;
       }
 
+      /* ── Overall annotator progress bar ── */
+      .progress-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+        padding: 0 4px;
+      }
+
+      .progress-track {
+        flex: 1;
+        height: 8px;
+        border-radius: 4px;
+        background: #e0e0e0;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #4caf50, #45a049);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+
+      .progress-text {
+        font-size: 13px;
+        color: #888;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
       .clip-step-btn {
         width: 38px;
         height: 38px;
@@ -765,7 +797,11 @@
         <div class="panel nav-panel">
           <h3>&#128194; Navigate Clips</h3>
           <div class="clip-nav-row">
-            <button class="clip-step-btn prev" id="prevClipBtn" title="Previous clip (Q)">
+            <button
+              class="clip-step-btn prev"
+              id="prevClipBtn"
+              title="Previous clip (Q)"
+            >
               &#9664;
             </button>
             <div class="clip-picker">
@@ -782,9 +818,19 @@
               >
               <button class="go-btn" id="goClipBtn">Go</button>
             </div>
-            <button class="clip-step-btn next" id="nextClipBtn" title="Next clip (E)">
+            <button
+              class="clip-step-btn next"
+              id="nextClipBtn"
+              title="Next clip (E)"
+            >
               &#9654;
             </button>
+          </div>
+          <div class="progress-row">
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span class="progress-text" id="progressText">— % — / — clips</span>
           </div>
         </div>
 
@@ -870,11 +916,19 @@
         <div class="panel">
           <h3>&#127991; Annotate Activity</h3>
           <div class="group-nav-row">
-            <button class="group-nav-btn prev" id="prevGroupBtn" title="Previous group">
+            <button
+              class="group-nav-btn prev"
+              id="prevGroupBtn"
+              title="Previous group"
+            >
               &#9664; Prev
             </button>
             <span class="group-counter" id="groupCounter">Group — / —</span>
-            <button class="group-nav-btn next" id="nextGroupBtn" title="Next group">
+            <button
+              class="group-nav-btn next"
+              id="nextGroupBtn"
+              title="Next group"
+            >
               Next &#9654;
             </button>
           </div>
@@ -996,6 +1050,8 @@
       const groupCounter    = document.getElementById('groupCounter');
       const modelPredictionsEl = document.getElementById('modelPredictions');
       const customLabelInput   = document.getElementById('customLabelInput');
+      const progressFill    = document.getElementById('progressFill');
+      const progressText    = document.getElementById('progressText');
 
       // ── Social-group box overlay state ────────────────────────────────────────
       let currentGroups     = [];
@@ -1003,6 +1059,10 @@
       let currentImgH       = 1080;
       let currentGroupIndex = -1;        // index into currentGroups of the highlighted group
       const groupAnnotationCache = {};   // clipId -> { frameStr: { groups, videoInfo, ... } }
+
+      // Sorted clip ids that actually have >=1 group on frame 1 — fetched once,
+      // used to skip empty clips when auto-advancing after a submit.
+      let clipsWithGroups = [];
 
       // Whether the current annotator already submitted ratings for every group
       // on the current clip/frame — once true, all rating inputs, the custom
@@ -1080,11 +1140,57 @@
           }
       }
 
+      // Fetched once at page load: the fixed set of clip ids with something to
+      // rate, so auto-advance never lands on an empty clip.
+      async function fetchClipsWithGroups() {
+          try {
+              const resp = await fetch(`${BASE_URL}/clips-with-groups`);
+              const data = await resp.json();
+              return data.success && Array.isArray(data.clip_ids) ? data.clip_ids : [];
+          } catch (err) {
+              console.error('Failed to fetch clips-with-groups:', err);
+              return [];
+          }
+      }
+
+      // Smallest clip id with groups that comes after afterClipId, or null if
+      // there isn't one (i.e. every rateable clip is done).
+      function nextClipWithGroups(afterClipId) {
+          for (const cid of clipsWithGroups) {
+              if (cid > afterClipId) return cid;
+          }
+          return null;
+      }
+
+      // Overall annotator progress across every clip that has groups on frame 1.
+      async function fetchProgress() {
+          try {
+              const resp = await fetch(`${BASE_URL}/progress`);
+              const data = await resp.json();
+              return data.success ? data : { done: 0, total: 0, percent: 0 };
+          } catch (err) {
+              console.error('Failed to fetch progress:', err);
+              return { done: 0, total: 0, percent: 0 };
+          }
+      }
+
+      function renderProgress({ done, total, percent }) {
+          progressFill.style.width = `${total > 0 ? percent : 0}%`;
+          progressText.textContent = `${percent}% - ${done}/${total} clips`;
+      }
+
+      async function refreshProgress() {
+          renderProgress(await fetchProgress());
+      }
+
       // Render the 6 model rows for whichever group is currently selected.
       function renderModelPredictions(groupId) {
-          customLabelInput.disabled = frameSubmitted;
+          // No groups on this frame at all — lock the custom label too, same
+          // greyed-out treatment as a fully submitted frame.
+          const noGroupOnFrame = groupId == null;
+          customLabelInput.disabled = frameSubmitted || noGroupOnFrame;
 
-          if (groupId == null) {
+          if (noGroupOnFrame) {
               customLabelInput.value = '';
               modelPredictionsEl.innerHTML = '<div class="no-predictions">No group selected.</div>';
               updateSubmitEnabled();
@@ -1237,16 +1343,21 @@
           updateSubmitEnabled();
       });
 
-      // Enter moves to the next model's rating box; stays put on the last one.
+      // Enter moves to the next ratable model's box; on the last one it behaves
+      // like clicking away — unfocus and close the dropdown instead of leaving
+      // the cursor (and the options list) sitting there.
       modelPredictionsEl.addEventListener('keydown', (e) => {
           if (e.key !== 'Enter' || !e.target.classList.contains('rating-input')) return;
           e.preventDefault();
           if (!validateRatingInput(e.target, { showWarning: true })) return;
-          const inputs = Array.from(modelPredictionsEl.querySelectorAll('.rating-input'));
+          const inputs = Array.from(modelPredictionsEl.querySelectorAll('.rating-input:not(:disabled)'));
           const idx = inputs.indexOf(e.target);
           if (idx >= 0 && idx < inputs.length - 1) {
               inputs[idx + 1].focus();
               inputs[idx + 1].select();
+          } else {
+              closeRatingDropdown(e.target.closest('.rating-wrap'));
+              e.target.blur();
           }
       });
 
@@ -1315,8 +1426,10 @@
               nextGroupBtn.disabled = true;
           } else {
               groupCounter.textContent = `Group ${currentGroupIndex + 1} / ${currentGroups.length}`;
-              prevGroupBtn.disabled = false;
-              nextGroupBtn.disabled = false;
+              // Nothing to step between with only one group — grey out nav same as "no groups".
+              const onlyOneGroup = currentGroups.length === 1;
+              prevGroupBtn.disabled = onlyOneGroup;
+              nextGroupBtn.disabled = onlyOneGroup;
           }
       }
 
@@ -1594,6 +1707,21 @@
               frameSubmitted = true;
               const selectedGroup = currentGroupIndex >= 0 ? currentGroups[currentGroupIndex] : null;
               renderModelPredictions(selectedGroup ? selectedGroup.groupId : null);
+
+              refreshProgress();
+
+              // Auto-advance to the next clip that actually has groups (skipping
+              // empty ones) so annotators don't have to manually click through —
+              // give them a beat to see the confirmation first.
+              submitBtn.textContent = '✅ Saved! Loading next clip…';
+              setTimeout(() => {
+                  const nextClipId = nextClipWithGroups(currentClipId);
+                  if (nextClipId != null) {
+                      loadNewClip(nextClipId);
+                  } else {
+                      submitBtn.textContent = '✅ All clips complete!';
+                  }
+              }, 900);
           } catch (err) {
               submitBtn.textContent = '❌ Error — retry?';
               submitBtn.disabled = false;
@@ -1614,6 +1742,8 @@
           // front — the submission-lock check is keyed off it, same as every
           // other annotation page in this app.
           await fetch('/api/get-annotator-id');
+          clipsWithGroups = await fetchClipsWithGroups();
+          refreshProgress();
           await loadClip(CLIP_ID);
           for (let i = 1; i < Math.min(5, numFrames); i++) {
               preloadFrame(currentClipId, i);

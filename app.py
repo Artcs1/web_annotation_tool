@@ -78,6 +78,17 @@ class VideoAnnotationApp:
             self.CULTURAL_GROUPS = {'annotations': []}
             print("[WARN] Cultural group boxes file (deepseek-vl2, ca) not found")
 
+        # Clips that actually have something to rate on the activity-annotation page
+        # (that page always looks at annotationFrame == 1). Used to skip empty clips
+        # during auto-advance and as the denominator for the progress bar.
+        self.CLIP_GROUP_COUNTS_FRAME1 = {}
+        for ann in self.CULTURAL_GROUPS.get('annotations', []):
+            if ann['videoInfo']['annotationFrame'] == 1:
+                num_groups = ann.get('numberOfGroups', 0)
+                if num_groups > 0:
+                    self.CLIP_GROUP_COUNTS_FRAME1[ann['videoIndex']] = num_groups
+        print(f"[INFO] Clips with >=1 group on frame 1: {len(self.CLIP_GROUP_COUNTS_FRAME1)}")
+
         # Pseudo activity-label predictions from all 5 VLMs, keyed down to just
         # (videoIndex, annotationFrame) -> groupId -> group_activity_dedup, since the
         # raw per-model files also carry verbose LLM call logs (group_activity_LMhist,
@@ -1367,6 +1378,36 @@ class VideoAnnotationApp:
             })
 
             return jsonify({'success': True, 'submitted': len(submitted_group_ids) >= num_groups})
+
+        @self.app.route('/api/activity_annotation/clips-with-groups')
+        def activity_annotation_clips_with_groups():
+            """Sorted clip ids that have >=1 group on frame 1 — used by the
+            frontend to skip empty clips when auto-advancing after a submit."""
+            return jsonify({
+                'success': True,
+                'clip_ids': sorted(self.CLIP_GROUP_COUNTS_FRAME1.keys()),
+            })
+
+        @self.app.route('/api/activity_annotation/progress')
+        def activity_annotation_progress():
+            """Current annotator's overall progress: how many of the clips that
+            actually have groups on frame 1 have been fully submitted."""
+            total = len(self.CLIP_GROUP_COUNTS_FRAME1)
+            done = 0
+
+            annotator_id = session.get('annotator_id')
+            if annotator_id and self.db is not None and total > 0:
+                pipeline = [
+                    {'$match': {'annotator_id': annotator_id, 'frameId': 1}},
+                    {'$group': {'_id': '$clipId', 'groupIds': {'$addToSet': '$groupId'}}},
+                ]
+                for row in self.activity_annotations_collection.aggregate(pipeline):
+                    expected = self.CLIP_GROUP_COUNTS_FRAME1.get(row['_id'], 0)
+                    if expected > 0 and len(row['groupIds']) >= expected:
+                        done += 1
+
+            percent = round((done / total) * 100) if total > 0 else 0
+            return jsonify({'success': True, 'done': done, 'total': total, 'percent': percent})
 
         @self.app.route('/api/activity_annotation/save-annotation', methods=['POST'])
         def activity_annotation_save_annotation():
