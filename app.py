@@ -48,7 +48,7 @@ class VideoAnnotationApp:
         self.ANNOTATIONS_FILE = self.BASE_DIR / "results" / "all_annotations.json"
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
         self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" /  "tracking_annotations.json"
-        self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3_v1.json"
+        self.DETECTIONS_CACHE_FILE = self.BASE_DIR / "detections_cache_sam3.json"
 
         with open(self.ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
             self.COARSE_ANNOTATIONS = json.load(f)
@@ -87,6 +87,7 @@ class VideoAnnotationApp:
             self.annotations_collection = self.db['annotations']
             self.yes_no_annotations_collection = self.db['yes_no_annotations']
             self.finegrained_annotations_collection = self.db['finegrained_annotations']
+            self.tracking_annotations_collection = self.db['tracking_annotations']
             print(f"✅ Connected to MongoDB: {self.MONGO_DB}")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
@@ -1204,8 +1205,116 @@ class VideoAnnotationApp:
                 return jsonify({'error': 'Frame not found'}), 404
             return send_from_directory(folder_path, frame_name)
 
+        ################################
+        ### TRACKING     UPDATER ANN ###
+        ################################
+
+        @self.app.route('/tracking_updater')
+        @self.app.route('/tracking_updater/<int:clip_id>')
+        def tracking_updater(clip_id=1):
+            """Editable tracking view: delete tracks / reassign group membership, backed by MongoDB"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            total_clips = self.tracking_annotations_collection.count_documents({})
+            doc = self.tracking_annotations_collection.find_one({'clip_id': clip_id})
+            num_frames = len(doc['frames']) if doc else 0
+            return render_template(
+                'tracking_updater.html',
+                clip_id=clip_id,
+                total_clips=total_clips,
+                num_frames=num_frames,
+            )
+
+        @self.app.route('/api/tracking_updater/annotations/<int:clip_id>')
+        def tracking_updater_annotations(clip_id):
+            """Return all frame tracking data for a clip, with deleted tracks filtered out"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            doc = self.tracking_annotations_collection.find_one({'clip_id': clip_id})
+            if not doc:
+                return jsonify({'success': False, 'error': 'Clip not found'}), 404
+
+            deleted_track_ids = set(doc.get('deleted_track_ids', []))
+            frames = {
+                frame_idx: [det for det in dets if det.get('track_id') not in deleted_track_ids]
+                for frame_idx, dets in doc['frames'].items()
+            }
+
+            return jsonify({
+                'success': True,
+                'clip_id': clip_id,
+                'frames': frames,
+                'deleted_track_ids': sorted(deleted_track_ids),
+            })
+
+        @self.app.route('/api/tracking_updater/frame/<int:clip_id>/<int:frame_id>')
+        def tracking_updater_frame(clip_id, frame_id):
+            """Serve a specific frame image (frame_id is 1-indexed)"""
+            folder_name = f"clip_{clip_id:04d}"
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
+            if not os.path.isdir(folder_path):
+                return jsonify({'error': 'Clip not found'}), 404
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            if not os.path.exists(os.path.join(folder_path, frame_name)):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(folder_path, frame_name)
+
+        @self.app.route('/api/tracking_updater/delete-track/<int:clip_id>/<int:track_id>', methods=['POST'])
+        def tracking_updater_delete_track(clip_id, track_id):
+            """Soft-delete a track: hide it from every frame of this clip without losing the data"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            result = self.tracking_annotations_collection.update_one(
+                {'clip_id': clip_id},
+                {'$addToSet': {'deleted_track_ids': track_id}, '$set': {'updated_at': datetime.utcnow()}}
+            )
+            if result.matched_count == 0:
+                return jsonify({'success': False, 'error': 'Clip not found'}), 404
+            return jsonify({'success': True})
+
+        @self.app.route('/api/tracking_updater/restore-track/<int:clip_id>/<int:track_id>', methods=['POST'])
+        def tracking_updater_restore_track(clip_id, track_id):
+            """Undo a soft-delete"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            result = self.tracking_annotations_collection.update_one(
+                {'clip_id': clip_id},
+                {'$pull': {'deleted_track_ids': track_id}, '$set': {'updated_at': datetime.utcnow()}}
+            )
+            if result.matched_count == 0:
+                return jsonify({'success': False, 'error': 'Clip not found'}), 404
+            return jsonify({'success': True})
+
+        @self.app.route('/api/tracking_updater/update-group/<int:clip_id>/<int:track_id>', methods=['POST'])
+        def tracking_updater_update_group(clip_id, track_id):
+            """Reassign every occurrence of a track_id (across all frames of the clip) to a new group_id"""
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+
+            new_group_id = request.json.get('group_id')
+            if new_group_id is None:
+                return jsonify({'success': False, 'error': 'group_id is required'}), 400
+
+            doc = self.tracking_annotations_collection.find_one({'clip_id': clip_id})
+            if not doc:
+                return jsonify({'success': False, 'error': 'Clip not found'}), 404
+
+            frames = doc['frames']
+            changed = 0
+            for dets in frames.values():
+                for det in dets:
+                    if det.get('track_id') == track_id:
+                        det['group_id'] = new_group_id
+                        changed += 1
+
+            self.tracking_annotations_collection.update_one(
+                {'clip_id': clip_id},
+                {'$set': {'frames': frames, 'updated_at': datetime.utcnow()}}
+            )
+            return jsonify({'success': True, 'updated_detections': changed})
+
         ##################################
-        ### ACTIVITY    VISUALIZER ANN ###       
+        ### ACTIVITY    VISUALIZER ANN ###
         ##################################
 
         @self.app.route('/activity_annotation')
@@ -1295,5 +1404,5 @@ video_app = VideoAnnotationApp()
 app = video_app.app
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8889)
+    app.run(debug=True, host='0.0.0.0', port=5000)
         
