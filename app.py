@@ -257,6 +257,9 @@ class VideoAnnotationApp:
                 global_counts = [self.annotations_collection.count_documents({"globalIndex": int((p+1)*self.number_of_clips), "videoInfo.annotationFrame": f}) for p, f in possible_choices]
                 possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]  
                 possible_choices = list(set(possible_choices) - set(ann_completed))
+
+                possible_choices = [(p,c) for p,c in possible_choices if p >=59]
+                print(possible_choices)
                 
                 id_r = random.randint(0, len(possible_choices)-1)
                 rand_number    = possible_choices[id_r][0]
