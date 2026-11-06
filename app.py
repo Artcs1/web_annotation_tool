@@ -33,7 +33,7 @@ class VideoAnnotationApp:
         self.MONGO_DB = 'video_annotations'
         self.annotator_per_clip = 3
         self.number_of_clips = 15
-        self.VIDEO_BASE_PATH = 'videos'
+        self.VIDEO_BASE_PATH = "EgoGroups/videos_frames/"
         self.YES_NO_VIDEO_BASE_PATH = 'yes_no_videos'
         self.VIDEO_VALIDATION_BASE_PATH = 'validation_videos'
         self.GTS_VALIDATION_BASE_PATH = 'validation_gts'
@@ -44,7 +44,7 @@ class VideoAnnotationApp:
         self.global_idx = 0
 
         self.BASE_DIR = Path(__file__).parent
-        self.VIDEOS_DIR = self.BASE_DIR / "videos"
+        #self.VIDEOS_DIR = self.BASE_DIR / "EgoGroups"/ "videos_frames"
         self.ANNOTATIONS_FILE = self.BASE_DIR / "results" / "all_annotations.json"
         self.FINEGRAINED_ANNOTATIONS_FILE = self.BASE_DIR / "results" / "finegrained_all_annotations.json"
         self.TRACKING_ANNOTATIONS_FILE = self.BASE_DIR / "results" /  "tracking_annotations.json"
@@ -88,6 +88,7 @@ class VideoAnnotationApp:
             self.yes_no_annotations_collection = self.db['yes_no_annotations']
             self.finegrained_annotations_collection = self.db['finegrained_annotations']
             self.tracking_annotations_collection = self.db['tracking_annotations']
+            self.metadata_validations_collection = self.db['metadata_validations']
             print(f"✅ Connected to MongoDB: {self.MONGO_DB}")
         except Exception as e:
             print(f"❌ MongoDB connection failed: {e}")
@@ -248,9 +249,6 @@ class VideoAnnotationApp:
             num_videos   = len(videos)
             num_blocks   = num_videos//self.number_of_clips
 
-            print(len(ann_incompleted))
-            print(len(ann_completed))
-
             if len(ann_incompleted) == 0:
 
                 possible_choices = [(block, f) for block in np.arange(num_blocks) for f in self.choices_annotatedframe]
@@ -258,9 +256,6 @@ class VideoAnnotationApp:
                 possible_choices = [p for p, c in zip(possible_choices, global_counts) if c < self.annotator_per_clip]  
                 possible_choices = list(set(possible_choices) - set(ann_completed))
 
-                possible_choices = [(p,c) for p,c in possible_choices if p >=59]
-                print(possible_choices)
-                
                 id_r = random.randint(0, len(possible_choices)-1)
                 rand_number    = possible_choices[id_r][0]
                 videos      = videos[int(rand_number*self.number_of_clips):int((rand_number+1)*self.number_of_clips)]
@@ -617,7 +612,6 @@ class VideoAnnotationApp:
             except:
                 ann_results = []
 
-            print(ann_results)
             annotated_clips = [(result['globalIndex']-1, result['videoInfo']['annotationFrame']) for result in ann_results]
             annotated_block = [(ann[0]//self.number_of_clips, ann[1]) for ann in annotated_clips]
 
@@ -625,7 +619,7 @@ class VideoAnnotationApp:
             unique = list(counter.keys())
             counts = list(counter.values())
 
-            ann_completed   = [u for u, c in zip(unique, counts) if c == self.number_of_clips] 
+            ann_completed   = [u for u, c in zip(unique, counts) if c >= self.number_of_clips] 
             ann_incompleted = [(u, int(c)) for u, c in zip(unique, counts) if c != self.number_of_clips]
             
             # Get video files
@@ -685,9 +679,6 @@ class VideoAnnotationApp:
                 start_index    = int(rand_number*self.number_of_clips)+left_in[id_r]
                 annotatedFrame = possible_frames[id_r]
 
-            print('VIDEO')
-            print(videos[0]) 
-
             #print(start_index)
             #print(annotatedFrame)
 
@@ -729,19 +720,13 @@ class VideoAnnotationApp:
             files.sort()
 
             folder_name = os.path.basename(files[video_index])
-            print(folder_name)
 
             frame_name = f"{str(frame_index + 1).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
-            print(frame_name)
             folder_path = os.path.join(self.VIDEO_BASE_PATH, folder_name)
 
             if not os.path.exists(os.path.join(folder_path, frame_name)):
                 return jsonify({'error': 'Frame not found'}), 404
        
-            print("REPORTS")
-            print(frame_name)
-            print(folder_path)
-            print("REPORTS")
             
             return send_from_directory(str(folder_path), frame_name)
         
@@ -763,7 +748,6 @@ class VideoAnnotationApp:
             folder_name = os.path.basename(files[video_index])
             video_index = int(folder_name.split("_")[-1])
     
-            print(video_index)
             # Find video annotation
             video_info = None
             for ann in self.COARSE_ANNOTATIONS['annotations']:
@@ -777,11 +761,10 @@ class VideoAnnotationApp:
             actual_video_index = video_info['videoIndex']
             coarse_groups = video_info['groups']
             annotation_frame = video_info['videoInfo']['annotationFrame']
-            print(annotation_frame)
         
             # Load annotation frame
-            print(str(annotation_frame).zfill(5)+".jpeg")
-            frame_path = self.VIDEOS_DIR / f"clip_{actual_video_index:04d}" / f"{annotation_frame+1:05d}.jpeg"
+            frame_path = f"{self.VIDEO_BASE_PATH}/clip_{actual_video_index:04d}/{annotation_frame+1:05d}.jpeg"
+            frame_path = Path(frame_path)
 
             if not frame_path.exists():
                 return jsonify({'error': 'Frame not found'}), 404
@@ -795,7 +778,6 @@ class VideoAnnotationApp:
         
             # Load detections from cache (preprocessed YOLO results)
             cache_key = str(video_index)+'_'+str(annotation_frame)
-            print(cache_key)
             if cache_key in self.DETECTIONS_CACHE:
                 print(f"[DETECT] Loading cached detections for video {actual_video_index}")
                 detections = []
@@ -1001,7 +983,6 @@ class VideoAnnotationApp:
                 #print(annotation['annotator_id'])
                 #annotation_copy = copy.deepcopy(results_list[idx])
             
-                print(annotation['annotator_id'])
                 annotation['_id'] = str(annotation['_id'])
             
                 if 'created_at' in annotation and isinstance(annotation['created_at'], datetime):
@@ -1033,11 +1014,9 @@ class VideoAnnotationApp:
 
                 data = request.json
                 #print(data)
-                print(annotator_id)
                 data['annotator_id'] = annotator_id or 'unknown'
                 data['created_at']   = datetime.utcnow()
                 data['updated_at']   = datetime.utcnow()
-                print(data)
 
                 result = self.annotations_collection.replace_one({"videoFolder": clip_name,"videoInfo.annotationFrame": frame, "annotator_id": annotator_id},data)
 
@@ -1069,7 +1048,6 @@ class VideoAnnotationApp:
             for ann in self.COARSE_ANNOTATIONS.get('annotations', []):
                 if ann['videoIndex'] == clip_id:
                     available_frames.append(ann['videoInfo']['annotationFrame'])
-            print(available_frames)
             available_frames = sorted(set(available_frames)) or [1, 21, 41]
             if frame_id is None:
                 frame_id = available_frames[0]
@@ -1362,8 +1340,146 @@ class VideoAnnotationApp:
 
 
 
+        ##########################
+        ### METADATA VALIDATOR ###
+        ##########################
+        # Confirm/correct the automatic per-clip labels (crowd density, weather,
+        # indoor/outdoor) stored in EgoGroups/jsons_step1/clip_XXXX.json.
+        # Validations are upserted per (clip_id, annotator_id) into Mongo.
+
+        self.METADATA_JSON_DIR = self.BASE_DIR / "EgoGroups" / "jsons_step1"
+        self.METADATA_OPTIONS = {
+            'density': ['scattered', 'moderate', 'crowded'],
+            'weather': ['sunny', 'cloudy', 'rainy', 'snowy', 'unknown'],
+            'scene':   ['indoor', 'outdoor'],
+        }
+
+        def load_clip_metadata(clip_id):
+            path = self.METADATA_JSON_DIR / f"clip_{clip_id:04d}.json"
+            if not path.exists():
+                return None
+            with open(path, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+            return {
+                'density': d.get('density'),
+                'weather': d.get('weather', {}),
+                'scene':   d.get('scene', {}),
+                'city': d.get('city'), 'country': d.get('country'),
+                'globe_region': d.get('globe_region'), 'dataset': d.get('dataset'),
+                'original_filename': d.get('original_filename'),
+            }
+
+        def metadata_annotator_id():
+            if 'annotator_id' not in session:
+                session['annotator_id'] = str(uuid.uuid4())
+                session.permanent = True
+            return session['annotator_id']
+
+        @self.app.route('/metadata_validator')
+        @self.app.route('/metadata_validator/<int:clip_id>')
+        def metadata_validator(clip_id=1):
+            metadata_annotator_id()
+            total_clips = len(glob.glob(str(self.METADATA_JSON_DIR / 'clip_*.json')))
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, f"clip_{clip_id:04d}")
+            num_frames = len(glob.glob(os.path.join(folder_path, f'*{self.FRAME_EXTENSION}')))
+            return render_template(
+                'metadata_validator.html',
+                clip_id=clip_id,
+                total_clips=total_clips,
+                num_frames=num_frames,
+                options=self.METADATA_OPTIONS,
+            )
+
+        @self.app.route('/api/metadata_validator/clip/<int:clip_id>')
+        def metadata_validator_clip(clip_id):
+            meta = load_clip_metadata(clip_id)
+            if meta is None:
+                return jsonify({'success': False, 'error': 'Metadata not found'}), 404
+            # Prefill with this annotator's own review; if none, the most recent review by anyone.
+            saved, saved_by = None, None
+            if self.db is not None:
+                me = metadata_annotator_id()
+                doc = self.metadata_validations_collection.find_one(
+                    {'clip_id': clip_id, 'annotator_id': me}, {'_id': 0})
+                if doc:
+                    saved_by = 'me'
+                else:
+                    doc = self.metadata_validations_collection.find_one(
+                        {'clip_id': clip_id}, {'_id': 0}, sort=[('updated_at', -1)])
+                    saved_by = 'other' if doc else None
+                if doc:
+                    saved = {k: doc.get(k) for k in ('density', 'weather', 'scene', 'notes', 'is_correct')}
+            return jsonify({'success': True, 'clip_id': clip_id, 'predicted': meta,
+                            'saved': saved, 'saved_by': saved_by})
+
+        @self.app.route('/api/metadata_validator/frame/<int:clip_id>/<int:frame_id>')
+        def metadata_validator_frame(clip_id, frame_id):
+            folder_path = os.path.join(self.VIDEO_BASE_PATH, f"clip_{clip_id:04d}")
+            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
+            if not os.path.exists(os.path.join(folder_path, frame_name)):
+                return jsonify({'error': 'Frame not found'}), 404
+            return send_from_directory(os.path.abspath(folder_path), frame_name)
+
+        @self.app.route('/api/metadata_validator/progress')
+        def metadata_validator_progress():
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            # Shared progress: a clip is reviewed once ANY annotator has saved it.
+            # "corrected" follows the most recent review of each clip.
+            me = metadata_annotator_id()
+            rows = self.metadata_validations_collection.aggregate([
+                {'$sort': {'updated_at': -1}},
+                {'$group': {'_id': '$clip_id',
+                            'latest_is_correct': {'$first': '$is_correct'},
+                            'annotators': {'$addToSet': '$annotator_id'}}},
+            ])
+            reviewed, corrected, mine = [], [], []
+            for r in rows:
+                reviewed.append(r['_id'])
+                if r.get('latest_is_correct') is False:
+                    corrected.append(r['_id'])
+                if me in r['annotators']:
+                    mine.append(r['_id'])
+            return jsonify({'success': True,
+                            'reviewed': sorted(reviewed),
+                            'corrected': sorted(corrected),
+                            'mine': sorted(mine)})
+
+        @self.app.route('/api/metadata_validator/save/<int:clip_id>', methods=['POST'])
+        def metadata_validator_save(clip_id):
+            if self.db is None:
+                return jsonify({'success': False, 'error': 'Database not connected'}), 500
+            meta = load_clip_metadata(clip_id)
+            if meta is None:
+                return jsonify({'success': False, 'error': 'Metadata not found'}), 404
+            data = request.json or {}
+            labels = {}
+            for key, allowed in self.METADATA_OPTIONS.items():
+                value = data.get(key)
+                if value not in allowed:
+                    return jsonify({'success': False, 'error': f'Invalid {key}: {value}'}), 400
+                labels[key] = value
+            # Weather can't be judged indoors: an indoor model prediction counts as weather 'unknown'.
+            raw_weather = meta['weather'].get('label')
+            predicted = {'density': meta['density'],
+                         'weather': 'unknown' if meta['scene'].get('label') == 'indoor' else raw_weather,
+                         'scene':   meta['scene'].get('label')}
+            annotator_id = metadata_annotator_id()
+            now = datetime.utcnow()
+            self.metadata_validations_collection.update_one(
+                {'clip_id': clip_id, 'annotator_id': annotator_id},
+                {'$set': {**labels,
+                          'predicted': predicted,
+                          'predicted_raw_weather': raw_weather,
+                          'is_correct': labels == predicted,
+                          'notes': (data.get('notes') or '').strip(),
+                          'updated_at': now},
+                 '$setOnInsert': {'created_at': now}},
+                upsert=True)
+            return jsonify({'success': True, 'is_correct': labels == predicted})
+
         ####################
-        ### MISCELANIOUS ###       
+        ### MISCELANIOUS ###
         ####################
 
         @self.app.route('/my-annotator-id')
