@@ -25,7 +25,7 @@
         }
         .header-bar small { font-weight: 500; font-size: 14px; opacity: .9; }
         .frame-wrap { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
-        .frame-wrap img { width: 100%; display: block; }
+        .frame-wrap video { width: 100%; display: block; aspect-ratio: 16 / 9; background: #000; }
         .frame-label {
             position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,.6); color: #fff;
             padding: 4px 10px; border-radius: 8px; font-size: 13px;
@@ -86,16 +86,17 @@
             <span id="reviewBadge" class="badge none">not reviewed</span>
         </div>
         <div class="frame-wrap">
-            <img id="frame" alt="frame">
-            <div class="frame-label" id="frameLabel">frame 1 / {{ num_frames }}</div>
+            <video id="video" src="/api/metadata_validator/video/{{ clip_id }}"
+                   muted loop autoplay playsinline preload="auto"></video>
+            <div class="frame-label" id="frameLabel">loading…</div>
         </div>
         <div class="player">
             <button id="playBtn" title="Space">⏸ Pause</button>
-            <input type="range" id="scrub" min="1" max="{{ num_frames if num_frames > 0 else 1 }}" value="1">
+            <input type="range" id="scrub" min="0" max="5" step="any" value="0">
             <select id="speed">
-                <option value="200">5 fps</option>
-                <option value="100" selected>10 fps</option>
-                <option value="50">20 fps</option>
+                <option value="0.5">0.5× (5 fps)</option>
+                <option value="1" selected>1× (10 fps)</option>
+                <option value="2">2× (20 fps)</option>
             </select>
         </div>
         <div class="nav">
@@ -150,7 +151,7 @@
 <script>
 const CLIP_ID = {{ clip_id }};
 const TOTAL_CLIPS = {{ total_clips }};
-const NUM_FRAMES = {{ num_frames }};
+const FPS = 10;  // MP4s are encoded at 10 fps, 50 frames per clip
 const OPTIONS = {{ options | tojson }};
 const KEYS = {
     density: ['1', '2', '3'],
@@ -167,32 +168,34 @@ let mine = new Set();       // reviewed by this annotator
 let rawWeather = null;      // model's weather label before the indoor -> unknown rule
 let savedBy = null;        // 'me' | 'other' | null for the current clip
 
-// ---------- frame player ----------
-const img = document.getElementById('frame');
+// ---------- video player ----------
+const video = document.getElementById('video');
 const scrub = document.getElementById('scrub');
 const frameLabel = document.getElementById('frameLabel');
 const playBtn = document.getElementById('playBtn');
 const speedSel = document.getElementById('speed');
-let frame = 1, playing = NUM_FRAMES > 1, timer = null;
-const frameUrl = f => `/api/metadata_validator/frame/${CLIP_ID}/${f}`;
-for (let f = 1; f <= NUM_FRAMES; f++) { const p = new Image(); p.src = frameUrl(f); }
+let playing = true, videoError = false;
 
-function showFrame(f) {
-    frame = f;
-    img.src = frameUrl(f);
-    scrub.value = f;
-    frameLabel.textContent = NUM_FRAMES ? `frame ${f} / ${NUM_FRAMES}` : 'no frames found';
-}
-function tick() { showFrame(frame >= NUM_FRAMES ? 1 : frame + 1); }
 function setPlaying(p) {
     playing = p;
-    clearInterval(timer);
-    if (p && NUM_FRAMES > 1) timer = setInterval(tick, parseInt(speedSel.value));
+    if (p) video.play().catch(() => {}); else video.pause();
     playBtn.textContent = p ? '⏸ Pause' : '▶ Play';
 }
 playBtn.onclick = () => setPlaying(!playing);
-speedSel.onchange = () => setPlaying(playing);
-scrub.oninput = () => { setPlaying(false); showFrame(parseInt(scrub.value)); };
+speedSel.onchange = () => { video.playbackRate = parseFloat(speedSel.value); };
+video.addEventListener('loadedmetadata', () => { scrub.max = video.duration; });
+video.addEventListener('error', () => { videoError = true; frameLabel.textContent = 'video not found'; });
+scrub.oninput = () => { setPlaying(false); video.currentTime = parseFloat(scrub.value); };
+
+function updatePlayerUi() {
+    if (!videoError && video.duration) {
+        const total = Math.round(video.duration * FPS);
+        const f = Math.min(total, Math.floor(video.currentTime * FPS) + 1);
+        frameLabel.textContent = `frame ${f} / ${total}`;
+        if (playing) scrub.value = video.currentTime;
+    }
+    requestAnimationFrame(updatePlayerUi);
+}
 
 // ---------- label options ----------
 function renderOptions() {
@@ -346,8 +349,7 @@ document.addEventListener('keydown', async e => {
     else if (k === 'n') nextUnreviewed();
 });
 
-showFrame(1);
-setPlaying(playing);
+updatePlayerUi();
 loadClip();
 loadProgress();
 </script>

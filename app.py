@@ -1348,6 +1348,8 @@ class VideoAnnotationApp:
         # Validations are upserted per (clip_id, annotator_id) into Mongo.
 
         self.METADATA_JSON_DIR = self.BASE_DIR / "EgoGroups" / "jsons_step1"
+        # One 960x540 MP4 per clip (clip_XXXX.mp4); this page plays these instead of JPEG frames.
+        self.METADATA_VIDEO_DIR = Path(os.getenv('METADATA_VIDEO_DIR', self.BASE_DIR / "EgoGroups" / "videos_mp4"))
         self.METADATA_OPTIONS = {
             'density': ['scattered', 'moderate', 'crowded'],
             'weather': ['sunny', 'cloudy', 'rainy', 'snowy', 'unknown'],
@@ -1380,13 +1382,10 @@ class VideoAnnotationApp:
         def metadata_validator(clip_id=1):
             metadata_annotator_id()
             total_clips = len(glob.glob(str(self.METADATA_JSON_DIR / 'clip_*.json')))
-            folder_path = os.path.join(self.VIDEO_BASE_PATH, f"clip_{clip_id:04d}")
-            num_frames = len(glob.glob(os.path.join(folder_path, f'*{self.FRAME_EXTENSION}')))
             return render_template(
                 'metadata_validator.html',
                 clip_id=clip_id,
                 total_clips=total_clips,
-                num_frames=num_frames,
                 options=self.METADATA_OPTIONS,
             )
 
@@ -1412,13 +1411,14 @@ class VideoAnnotationApp:
             return jsonify({'success': True, 'clip_id': clip_id, 'predicted': meta,
                             'saved': saved, 'saved_by': saved_by})
 
-        @self.app.route('/api/metadata_validator/frame/<int:clip_id>/<int:frame_id>')
-        def metadata_validator_frame(clip_id, frame_id):
-            folder_path = os.path.join(self.VIDEO_BASE_PATH, f"clip_{clip_id:04d}")
-            frame_name = f"{str(frame_id).zfill(self.FRAME_COUNT_PADDING)}{self.FRAME_EXTENSION}"
-            if not os.path.exists(os.path.join(folder_path, frame_name)):
-                return jsonify({'error': 'Frame not found'}), 404
-            return send_from_directory(os.path.abspath(folder_path), frame_name)
+        @self.app.route('/api/metadata_validator/video/<int:clip_id>')
+        def metadata_validator_video(clip_id):
+            video_name = f"clip_{clip_id:04d}.mp4"
+            if not (self.METADATA_VIDEO_DIR / video_name).exists():
+                return jsonify({'error': 'Video not found'}), 404
+            # send_from_directory supports HTTP range requests, so the browser can seek.
+            return send_from_directory(str(self.METADATA_VIDEO_DIR.resolve()), video_name,
+                                       mimetype='video/mp4', max_age=86400)
 
         @self.app.route('/api/metadata_validator/progress')
         def metadata_validator_progress():
