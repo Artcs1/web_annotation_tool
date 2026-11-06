@@ -164,7 +164,7 @@ let probs = {};          // {weather: {...}, scene: {...}}
 let selected = {};       // current choice
 let reviewed = new Set();   // reviewed by anyone (shared)
 let mine = new Set();       // reviewed by this annotator
-let weatherLowConf = false; // model's weather confidence too low -> keep 'unknown'
+let weatherConfident = true; // some weather class above 50% -> never force 'unknown'
 let rawWeather = null;     // model's weather label before the indoor -> unknown rule
 let savedBy = null;        // 'me' | 'other' | null for the current clip
 
@@ -223,14 +223,14 @@ function renderOptions() {
     }
 }
 
-// Weather can't be judged indoors: switching to indoor sets weather to 'unknown';
-// switching back to outdoor restores the model's raw weather guess, unless that guess
-// was too uncertain (no class above 50%), in which case weather stays 'unknown'.
+// Indoors with an uncertain weather guess (no class above 50%), weather is 'unknown':
+// switching to indoor sets it to 'unknown' only if the model's guess was uncertain;
+// switching back to outdoor restores the model's raw weather guess.
 function choose(field, v) {
     selected[field] = v;
     if (field === 'scene') {
-        if (v === 'indoor') selected.weather = 'unknown';
-        else if (selected.weather === 'unknown' && !weatherLowConf) selected.weather = rawWeather;
+        if (v === 'indoor') { if (!weatherConfident) selected.weather = 'unknown'; }
+        else if (selected.weather === 'unknown') selected.weather = rawWeather;
     }
     renderOptions();
 }
@@ -265,16 +265,13 @@ async function loadClip() {
     if (!d.success) { document.getElementById('metaInfo').textContent = d.error; return; }
     const m = d.predicted;
     rawWeather = d.raw_weather;
-    weatherLowConf = d.weather_unknown_reason === 'low_confidence';
+    weatherConfident = d.weather_confident;
     predicted = { ...d.model_labels };
     const note = document.getElementById('weatherNote');
-    const reasons = {
-        indoor: 'The model predicted indoor',
-        low_confidence: 'No weather class has more than 50% confidence',
-    };
-    note.style.display = d.weather_unknown_reason ? 'block' : 'none';
-    note.textContent = d.weather_unknown_reason
-        ? `${reasons[d.weather_unknown_reason]}, so weather is set to unknown (the model's raw weather guess was "${rawWeather}").`
+    const forcedUnknown = predicted.weather === 'unknown';
+    note.style.display = forcedUnknown ? 'block' : 'none';
+    note.textContent = forcedUnknown
+        ? `The model predicted indoor and no weather class has more than 50% confidence, so weather is set to unknown (the model's raw weather guess was "${rawWeather}").`
         : '';
     probs = { weather: m.weather.probs || {}, scene: m.scene.probs || {}, time_of_day: m.time_of_day.probs || {} };
     selected = d.saved

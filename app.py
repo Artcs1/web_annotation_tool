@@ -1348,7 +1348,7 @@ class VideoAnnotationApp:
         # Validations are upserted per (clip_id, annotator_id) into Mongo.
 
         self.METADATA_JSON_DIR = Path(os.getenv('METADATA_JSON_DIR', self.BASE_DIR / "EgoGroups" / "jsons_step1_renewed"))
-        # Weather counts as 'unknown' when the model says indoor or no weather class exceeds this.
+        # Weather counts as 'unknown' when the model says indoor AND no weather class exceeds this.
         self.METADATA_WEATHER_MIN_CONF = 0.5
         # One 960x540 MP4 per clip (clip_XXXX.mp4); this page plays these instead of JPEG frames.
         self.METADATA_VIDEO_DIR = Path(os.getenv('METADATA_VIDEO_DIR', self.BASE_DIR / "EgoGroups" / "videos_mp4"))
@@ -1378,21 +1378,18 @@ class VideoAnnotationApp:
         def model_labels(meta):
             """The model's labels as the reviewer is asked to confirm them.
 
-            Weather becomes 'unknown' when the model says indoor, or when no weather
+            Weather becomes 'unknown' only when the model says indoor AND no weather
             class has confidence above METADATA_WEATHER_MIN_CONF.
             """
             raw_weather = meta['weather'].get('label')
             weather_probs = meta['weather'].get('probs') or {}
-            reason = None
-            if meta['scene'].get('label') == 'indoor':
-                reason = 'indoor'
-            elif not weather_probs or max(weather_probs.values()) <= self.METADATA_WEATHER_MIN_CONF:
-                reason = 'low_confidence'
+            confident = bool(weather_probs) and max(weather_probs.values()) > self.METADATA_WEATHER_MIN_CONF
+            indoor = meta['scene'].get('label') == 'indoor'
             labels = {'density': meta['density'],
-                      'weather': 'unknown' if reason else raw_weather,
+                      'weather': 'unknown' if indoor and not confident else raw_weather,
                       'scene': meta['scene'].get('label'),
                       'time_of_day': meta['time_of_day'].get('label')}
-            return labels, raw_weather, reason
+            return labels, raw_weather, confident
 
         def metadata_annotator_id():
             if 'annotator_id' not in session:
@@ -1468,10 +1465,10 @@ class VideoAnnotationApp:
                     saved_by = 'other' if doc else None
                 if doc:
                     saved = {k: doc.get(k) for k in (*self.METADATA_OPTIONS, 'notes', 'is_correct')}
-            labels, raw_weather, reason = model_labels(meta)
+            labels, raw_weather, confident = model_labels(meta)
             return jsonify({'success': True, 'clip_id': clip_id, 'predicted': meta,
                             'model_labels': labels, 'raw_weather': raw_weather,
-                            'weather_unknown_reason': reason,
+                            'weather_confident': confident,
                             'saved': saved, 'saved_by': saved_by})
 
         @self.app.route('/api/metadata_validator/video/<int:clip_id>')
