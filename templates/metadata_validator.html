@@ -100,11 +100,7 @@
             </select>
         </div>
         <div class="nav">
-            <button id="prevBtn" title="←">← Prev</button>
-            <button id="nextBtn" title="→">Next →</button>
-            <button id="nextUnreviewedBtn" title="N">Next unreviewed ⇥</button>
-            <input type="number" id="jumpInput" min="1" max="{{ total_clips }}" placeholder="clip #">
-            <button id="jumpBtn">Go</button>
+            <button id="prevBtn" title="←">← Back</button>
         </div>
         <div>
             <div class="help" id="progressText">Loading progress…</div>
@@ -128,6 +124,10 @@
             <h3>Indoor / outdoor <span class="key"><kbd>I</kbd> <kbd>O</kbd></span></h3>
             <div class="options" id="opt-scene"></div>
         </div>
+        <div class="card">
+            <h3>Time of day <span class="key"><kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd></span></h3>
+            <div class="options" id="opt-time_of_day"></div>
+        </div>
 
         <div class="card">
             <h3>Notes (optional)</h3>
@@ -136,14 +136,13 @@
 
         <div class="nav">
             <button class="primary" id="saveNextBtn" title="Enter">✔ Save &amp; next unreviewed</button>
-            <button id="saveBtn">Save</button>
         </div>
         <div class="status" id="status"></div>
 
         <div class="help">
             The labels start out as the model's prediction (or your earlier answer, if you saved one).
             Change any that are wrong, then press <kbd>Enter</kbd>. Changed labels show in orange.<br>
-            <kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> previous/next clip · <kbd>N</kbd> next unreviewed
+            <kbd>Space</kbd> play/pause · <kbd>←</kbd> back to the clip you were on
         </div>
     </div>
 </div>
@@ -157,15 +156,16 @@ const KEYS = {
     density: ['1', '2', '3'],
     weather: ['q', 'w', 'e', 'r', 't'],
     scene:   ['i', 'o'],
+    time_of_day: ['z', 'x', 'c'],
 };
 
 let predicted = {};      // {density, weather, scene} model labels
 let probs = {};          // {weather: {...}, scene: {...}}
 let selected = {};       // current choice
 let reviewed = new Set();   // reviewed by anyone (shared)
-let corrected = new Set();  // latest review changed the model's labels
 let mine = new Set();       // reviewed by this annotator
-let rawWeather = null;      // model's weather label before the indoor -> unknown rule
+let weatherLowConf = false; // model's weather confidence too low -> keep 'unknown'
+let rawWeather = null;     // model's weather label before the indoor -> unknown rule
 let savedBy = null;        // 'me' | 'other' | null for the current clip
 
 // ---------- video player ----------
@@ -224,12 +224,13 @@ function renderOptions() {
 }
 
 // Weather can't be judged indoors: switching to indoor sets weather to 'unknown';
-// switching back to outdoor restores the model's raw weather guess.
+// switching back to outdoor restores the model's raw weather guess, unless that guess
+// was too uncertain (no class above 50%), in which case weather stays 'unknown'.
 function choose(field, v) {
     selected[field] = v;
     if (field === 'scene') {
         if (v === 'indoor') selected.weather = 'unknown';
-        else if (selected.weather === 'unknown') selected.weather = rawWeather;
+        else if (selected.weather === 'unknown' && !weatherLowConf) selected.weather = rawWeather;
     }
     renderOptions();
 }
@@ -243,15 +244,16 @@ function setStatus(msg, ok) {
 function updateBadge() {
     const b = document.getElementById('reviewBadge');
     if (!reviewed.has(CLIP_ID)) { b.className = 'badge none'; b.textContent = 'not reviewed'; return; }
+    // Any annotated clip counts as corrected, whether or not the labels were changed.
     const who = mine.has(CLIP_ID) ? 'by you' : 'by another annotator';
-    if (corrected.has(CLIP_ID)) { b.className = 'badge fix'; b.textContent = `reviewed ${who} · corrected`; }
-    else { b.className = 'badge ok'; b.textContent = `reviewed ${who} · confirmed`; }
+    b.className = 'badge fix';
+    b.textContent = `corrected ${who}`;
 }
 
 function updateProgress() {
     const n = reviewed.size;
     document.getElementById('progressText').textContent =
-        `All annotators: ${n} / ${TOTAL_CLIPS} clips reviewed (${corrected.size} corrected) · ` +
+        `All annotators: ${n} / ${TOTAL_CLIPS} clips corrected · ` +
         `Your contribution: ${mine.size} clips`;
     document.getElementById('progressBar').style.width = `${TOTAL_CLIPS ? 100 * n / TOTAL_CLIPS : 0}%`;
     updateBadge();
@@ -262,17 +264,22 @@ async function loadClip() {
     const d = await r.json();
     if (!d.success) { document.getElementById('metaInfo').textContent = d.error; return; }
     const m = d.predicted;
-    rawWeather = m.weather.label;
-    const modelIndoor = m.scene.label === 'indoor';
-    predicted = { density: m.density, weather: modelIndoor ? 'unknown' : rawWeather, scene: m.scene.label };
+    rawWeather = d.raw_weather;
+    weatherLowConf = d.weather_unknown_reason === 'low_confidence';
+    predicted = { ...d.model_labels };
     const note = document.getElementById('weatherNote');
-    note.style.display = modelIndoor ? 'block' : 'none';
-    note.textContent = modelIndoor
-        ? `The model predicted indoor, so weather is set to unknown (the model's raw weather guess was "${rawWeather}").`
+    const reasons = {
+        indoor: 'The model predicted indoor',
+        low_confidence: 'No weather class has more than 50% confidence',
+    };
+    note.style.display = d.weather_unknown_reason ? 'block' : 'none';
+    note.textContent = d.weather_unknown_reason
+        ? `${reasons[d.weather_unknown_reason]}, so weather is set to unknown (the model's raw weather guess was "${rawWeather}").`
         : '';
-    probs = { weather: m.weather.probs || {}, scene: m.scene.probs || {} };
-    selected = d.saved ? { density: d.saved.density, weather: d.saved.weather, scene: d.saved.scene }
-                       : { ...predicted };
+    probs = { weather: m.weather.probs || {}, scene: m.scene.probs || {}, time_of_day: m.time_of_day.probs || {} };
+    selected = d.saved
+        ? Object.fromEntries(Object.keys(OPTIONS).map(k => [k, d.saved[k]]))
+        : { ...predicted };
     savedBy = d.saved_by;
     document.getElementById('notes').value = (savedBy === 'me' && d.saved.notes) || '';
     if (savedBy === 'other') setStatus("Already reviewed by another annotator. Their labels are filled in; if you save, you'll be added as a reviewer too.", true);
@@ -289,7 +296,6 @@ async function loadProgress() {
         const d = await r.json();
         if (!d.success) throw new Error(d.error);
         reviewed = new Set(d.reviewed);
-        corrected = new Set(d.corrected);
         mine = new Set(d.mine);
         updateProgress();
     } catch (e) {
@@ -307,34 +313,61 @@ async function save() {
     reviewed.add(CLIP_ID);
     mine.add(CLIP_ID);
     savedBy = 'me';
-    if (d.is_correct) corrected.delete(CLIP_ID); else corrected.add(CLIP_ID);
     updateProgress();
-    setStatus(d.is_correct ? 'Saved: model labels confirmed.' : 'Saved with corrections.', true);
+    setStatus('Saved.', true);
     return true;
 }
 
 function goto(id) {
     if (id >= 1 && id <= TOTAL_CLIPS) window.location.href = `/metadata_validator/${id}`;
 }
-function nextUnreviewed() {
-    for (let k = 1; k <= TOTAL_CLIPS; k++) {
-        const id = ((CLIP_ID - 1 + k) % TOTAL_CLIPS) + 1;
-        if (!reviewed.has(id)) return goto(id);
-    }
-    setStatus('All clips have been reviewed by the team 🎉', true);
-}
 
-document.getElementById('prevBtn').onclick = () => goto(CLIP_ID - 1);
-document.getElementById('nextBtn').onclick = () => goto(CLIP_ID + 1);
-document.getElementById('nextUnreviewedBtn').onclick = nextUnreviewed;
-document.getElementById('jumpBtn').onclick = () => goto(parseInt(document.getElementById('jumpInput').value));
-document.getElementById('saveBtn').onclick = save;
+// ---------- visit history (per browser tab) ----------
+// "Back" returns to the clip you were actually on before, even if it is now reviewed,
+// so you can fix the one you just saved (re-saving overwrites your own earlier answer).
+const HISTORY_KEY = 'metadata_validator_history';
+function readHistory() {
+    try { return JSON.parse(sessionStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; }
+}
+function writeHistory(h) {
+    try { sessionStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-200))); } catch (e) {}
+}
+(function recordVisit() {
+    const h = readHistory();
+    if (h[h.length - 1] !== CLIP_ID) h.push(CLIP_ID);
+    writeHistory(h);
+    document.getElementById('prevBtn').disabled = h.length < 2;
+})();
+function goBack() {
+    const h = readHistory();
+    if (h[h.length - 1] === CLIP_ID) h.pop();
+    const prev = h.pop();
+    if (prev === undefined) { setStatus('No previous clip in this tab.', false); return; }
+    writeHistory(h);  // prev is pushed again when its page loads
+    goto(prev);
+}
+// Only ever navigate to clips nobody has reviewed. The server checks the database at
+// the moment of the click, so clips other annotators just saved are skipped too.
+// direction: 'random' (save & next).
+async function gotoUnreviewed(direction) {
+    try {
+        const r = await fetch(`/api/metadata_validator/unreviewed?from=${CLIP_ID}&direction=${direction}`);
+        const d = await r.json();
+        if (!d.success) throw new Error(d.error);
+        if (d.clip_id === null) setStatus('All clips have been reviewed by the team 🎉', true);
+        else goto(d.clip_id);
+    } catch (e) {
+        setStatus('Could not find the next clip: ' + e.message, false);
+    }
+}
+const nextUnreviewed = () => gotoUnreviewed('random');
+
+document.getElementById('prevBtn').onclick = goBack;
 document.getElementById('saveNextBtn').onclick = async () => { if (await save()) nextUnreviewed(); };
 
 document.addEventListener('keydown', async e => {
     const tag = e.target.tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT') {
-        if (e.key === 'Enter' && tag === 'INPUT') document.getElementById('jumpBtn').click();
         return;
     }
     const k = e.key.toLowerCase();
@@ -344,9 +377,7 @@ document.addEventListener('keydown', async e => {
     }
     if (e.key === 'Enter') { e.preventDefault(); if (await save()) nextUnreviewed(); }
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
-    else if (e.key === 'ArrowLeft') goto(CLIP_ID - 1);
-    else if (e.key === 'ArrowRight') goto(CLIP_ID + 1);
-    else if (k === 'n') nextUnreviewed();
+    else if (e.key === 'ArrowLeft') goBack();
 });
 
 updatePlayerUi();

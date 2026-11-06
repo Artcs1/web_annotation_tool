@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, send_from_directory, session
+from flask import Flask, render_template, jsonify, request, send_from_directory, session, redirect
 from scipy.optimize import linear_sum_assignment
 
 import uuid
@@ -1344,16 +1344,19 @@ class VideoAnnotationApp:
         ### METADATA VALIDATOR ###
         ##########################
         # Confirm/correct the automatic per-clip labels (crowd density, weather,
-        # indoor/outdoor) stored in EgoGroups/jsons_step1/clip_XXXX.json.
+        # indoor/outdoor, time of day) stored in EgoGroups/jsons_step1_renewed/clip_XXXX.json.
         # Validations are upserted per (clip_id, annotator_id) into Mongo.
 
-        self.METADATA_JSON_DIR = self.BASE_DIR / "EgoGroups" / "jsons_step1"
+        self.METADATA_JSON_DIR = Path(os.getenv('METADATA_JSON_DIR', self.BASE_DIR / "EgoGroups" / "jsons_step1_renewed"))
+        # Weather counts as 'unknown' when the model says indoor or no weather class exceeds this.
+        self.METADATA_WEATHER_MIN_CONF = 0.5
         # One 960x540 MP4 per clip (clip_XXXX.mp4); this page plays these instead of JPEG frames.
         self.METADATA_VIDEO_DIR = Path(os.getenv('METADATA_VIDEO_DIR', self.BASE_DIR / "EgoGroups" / "videos_mp4"))
         self.METADATA_OPTIONS = {
             'density': ['scattered', 'moderate', 'crowded'],
-            'weather': ['sunny', 'cloudy', 'rainy', 'snowy', 'unknown'],
+            'weather': ['clear', 'cloudy', 'rainy', 'snowy', 'unknown'],
             'scene':   ['indoor', 'outdoor'],
+            'time_of_day': ['day', 'twilight', 'night'],
         }
 
         def load_clip_metadata(clip_id):
@@ -1366,10 +1369,30 @@ class VideoAnnotationApp:
                 'density': d.get('density'),
                 'weather': d.get('weather', {}),
                 'scene':   d.get('scene', {}),
+                'time_of_day': d.get('time_of_day') or {},
                 'city': d.get('city'), 'country': d.get('country'),
                 'globe_region': d.get('globe_region'), 'dataset': d.get('dataset'),
                 'original_filename': d.get('original_filename'),
             }
+
+        def model_labels(meta):
+            """The model's labels as the reviewer is asked to confirm them.
+
+            Weather becomes 'unknown' when the model says indoor, or when no weather
+            class has confidence above METADATA_WEATHER_MIN_CONF.
+            """
+            raw_weather = meta['weather'].get('label')
+            weather_probs = meta['weather'].get('probs') or {}
+            reason = None
+            if meta['scene'].get('label') == 'indoor':
+                reason = 'indoor'
+            elif not weather_probs or max(weather_probs.values()) <= self.METADATA_WEATHER_MIN_CONF:
+                reason = 'low_confidence'
+            labels = {'density': meta['density'],
+                      'weather': 'unknown' if reason else raw_weather,
+                      'scene': meta['scene'].get('label'),
+                      'time_of_day': meta['time_of_day'].get('label')}
+            return labels, raw_weather, reason
 
         def metadata_annotator_id():
             if 'annotator_id' not in session:
@@ -1377,9 +1400,46 @@ class VideoAnnotationApp:
                 session.permanent = True
             return session['annotator_id']
 
+        def metadata_clip_ids():
+            return sorted(int(os.path.basename(p)[5:9])
+                          for p in glob.glob(str(self.METADATA_JSON_DIR / 'clip_*.json')))
+
+        def pick_unreviewed(current, direction):
+            """Return a clip nobody has reviewed yet, or None when all are done.
+
+            direction: 'random', 'next' (after current, wrapping) or 'prev' (before current, wrapping).
+            """
+            reviewed = set()
+            if self.db is not None:
+                reviewed = set(self.metadata_validations_collection.distinct('clip_id'))
+            ids = metadata_clip_ids()
+            todo = [c for c in ids if c not in reviewed and c != current]
+            if not todo:
+                return None
+            if direction == 'random':
+                return random.choice(todo)
+            if direction == 'prev':
+                before = [c for c in todo if c < current]
+                return before[-1] if before else todo[-1]
+            after = [c for c in todo if c > current]
+            return after[0] if after else todo[0]
+
         @self.app.route('/metadata_validator')
+        def metadata_validator_start():
+            """Land on a random clip that nobody has reviewed yet."""
+            metadata_annotator_id()
+            return redirect(f"/metadata_validator/{pick_unreviewed(None, 'random') or 1}")
+
+        @self.app.route('/api/metadata_validator/unreviewed')
+        def metadata_validator_unreviewed():
+            current = request.args.get('from', type=int)
+            direction = request.args.get('direction', 'random')
+            if direction not in ('random', 'next', 'prev'):
+                return jsonify({'success': False, 'error': f'Invalid direction: {direction}'}), 400
+            return jsonify({'success': True, 'clip_id': pick_unreviewed(current or 0, direction)})
+
         @self.app.route('/metadata_validator/<int:clip_id>')
-        def metadata_validator(clip_id=1):
+        def metadata_validator(clip_id):
             metadata_annotator_id()
             total_clips = len(glob.glob(str(self.METADATA_JSON_DIR / 'clip_*.json')))
             return render_template(
@@ -1407,8 +1467,11 @@ class VideoAnnotationApp:
                         {'clip_id': clip_id}, {'_id': 0}, sort=[('updated_at', -1)])
                     saved_by = 'other' if doc else None
                 if doc:
-                    saved = {k: doc.get(k) for k in ('density', 'weather', 'scene', 'notes', 'is_correct')}
+                    saved = {k: doc.get(k) for k in (*self.METADATA_OPTIONS, 'notes', 'is_correct')}
+            labels, raw_weather, reason = model_labels(meta)
             return jsonify({'success': True, 'clip_id': clip_id, 'predicted': meta,
+                            'model_labels': labels, 'raw_weather': raw_weather,
+                            'weather_unknown_reason': reason,
                             'saved': saved, 'saved_by': saved_by})
 
         @self.app.route('/api/metadata_validator/video/<int:clip_id>')
@@ -1425,24 +1488,19 @@ class VideoAnnotationApp:
             if self.db is None:
                 return jsonify({'success': False, 'error': 'Database not connected'}), 500
             # Shared progress: a clip is reviewed once ANY annotator has saved it.
-            # "corrected" follows the most recent review of each clip.
+            # Any annotated clip counts as corrected (human-verified); whether the labels
+            # matched the model is still stored per record as is_correct.
             me = metadata_annotator_id()
             rows = self.metadata_validations_collection.aggregate([
-                {'$sort': {'updated_at': -1}},
-                {'$group': {'_id': '$clip_id',
-                            'latest_is_correct': {'$first': '$is_correct'},
-                            'annotators': {'$addToSet': '$annotator_id'}}},
+                {'$group': {'_id': '$clip_id', 'annotators': {'$addToSet': '$annotator_id'}}},
             ])
-            reviewed, corrected, mine = [], [], []
+            reviewed, mine = [], []
             for r in rows:
                 reviewed.append(r['_id'])
-                if r.get('latest_is_correct') is False:
-                    corrected.append(r['_id'])
                 if me in r['annotators']:
                     mine.append(r['_id'])
             return jsonify({'success': True,
                             'reviewed': sorted(reviewed),
-                            'corrected': sorted(corrected),
                             'mine': sorted(mine)})
 
         @self.app.route('/api/metadata_validator/save/<int:clip_id>', methods=['POST'])
@@ -1459,11 +1517,7 @@ class VideoAnnotationApp:
                 if value not in allowed:
                     return jsonify({'success': False, 'error': f'Invalid {key}: {value}'}), 400
                 labels[key] = value
-            # Weather can't be judged indoors: an indoor model prediction counts as weather 'unknown'.
-            raw_weather = meta['weather'].get('label')
-            predicted = {'density': meta['density'],
-                         'weather': 'unknown' if meta['scene'].get('label') == 'indoor' else raw_weather,
-                         'scene':   meta['scene'].get('label')}
+            predicted, raw_weather, _ = model_labels(meta)
             annotator_id = metadata_annotator_id()
             now = datetime.utcnow()
             self.metadata_validations_collection.update_one(
